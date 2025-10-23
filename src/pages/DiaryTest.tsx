@@ -91,7 +91,7 @@ export default function DiaryTest() {
             {displayDiary && (
                 <div>
                     <h2>다이어리 페이지</h2>
-                    <button onClick={search}>내 기분에 맞는 대화 상대 찾기</button>
+                    <button onClick={search}>내 기분에 맞는 대화 상대 찾기 dsdasdas</button>
                 </div>
             )}
             {/* <1> 다이어리 페이지 -끝- */}
