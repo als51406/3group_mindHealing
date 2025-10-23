@@ -78,7 +78,7 @@ export default function Home() {
             {/* <1> 첫 페이지 -시작- */}
             {firstPage && (
                 <div>
-                    <p>오늘 하루는 어땠나요?</p>
+                    <p>오늘 하루는 어땠나요? 슬퍼요</p>
                     <form onSubmit={firstChat}>
                         <input />
                     </form>
