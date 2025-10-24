@@ -1,4 +1,15 @@
-import 'dotenv/config';
+// Load .env from project root explicitly to avoid CWD issues
+import path from 'node:path';
+import fs from 'node:fs';
+import dotenv from 'dotenv';
+const envPath = path.resolve(process.cwd(), '.env');
+if (fs.existsSync(envPath)) {
+  dotenv.config({ path: envPath });
+} else {
+  // attempt fallback to project root relative to this file
+  const fallback = path.resolve(path.dirname(new URL(import.meta.url).pathname), '../.env');
+  if (fs.existsSync(fallback)) dotenv.config({ path: fallback });
+}
 import express from 'express';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
@@ -9,15 +20,31 @@ import jwt from 'jsonwebtoken';
 // 환경변수: MONGO_URI(외부 IP 포함), DB_NAME, PORT
 const MONGO_URI = process.env.MONGO_URI || '';
 const DB_NAME = process.env.DB_NAME || 'appdb';
-const PORT = Number(process.env.PORT || 5174);
+// Vite proxy in vite.config.ts targets 7780; use that as default here for out-of-the-box dev.
+const PORT = Number(process.env.PORT || 7780);
 const JWT_SECRET = process.env.JWT_SECRET || 'dev_secret';
 
-if (!MONGO_URI) {
-  console.error('MONGO_URI 환경변수가 필요합니다. 예: mongodb://USER:PASS@<EXTERNAL_IP>:27017/?authSource=admin');
+function assertEnv() {
+  const missing: string[] = [];
+  if (!MONGO_URI) missing.push('MONGO_URI');
+  if (!DB_NAME) missing.push('DB_NAME');
+  if (!JWT_SECRET) missing.push('JWT_SECRET');
+  if (!PORT) missing.push('PORT');
+  if (missing.length) {
+    console.error('필수 환경변수가 누락되었습니다:', missing.join(', '));
+    process.exit(1);
+  }
 }
+assertEnv();
 
 const app = express();
-app.use(cors());
+// Allow cookies via CORS when frontend and API are on different origins (or proxied via Vite)
+app.use(
+  cors({
+    origin: (_origin, cb) => cb(null, true), // reflect request origin
+    credentials: true,
+  })
+);
 app.use(express.json());
 app.use(cookieParser());
 
@@ -185,13 +212,36 @@ app.get('/api/health', async (_req, res) => {
   try {
     const client = await getClient();
     await client.db('admin').command({ ping: 1 });
-    res.json({ ok: true, db: 'up' });
+  res.json({ ok: true, db: 'up', dbName: DB_NAME });
   } catch {
     res.status(500).json({ ok: false, db: 'down' });
   }
 });
 
-app.listen(PORT, async () => {
-  await ensureIndexes();
-  console.log(`API server listening on http://localhost:${PORT}`);
+// Debug: database info (DEV only)
+app.get('/api/debug/db-info', async (_req, res) => {
+  try {
+    const client = await getClient();
+    const db = client.db(DB_NAME);
+    const usersCount = await db.collection('users').countDocuments({});
+    const messagesCount = await db.collection('messages').countDocuments({});
+    res.json({ ok: true, dbName: DB_NAME, counts: { users: usersCount, messages: messagesCount } });
+  } catch (e) {
+    res.status(500).json({ ok: false, message: 'debug info error' });
+  }
 });
+
+// Start only after confirming DB readiness
+(async () => {
+  try {
+    const client = await getClient();
+    await client.db('admin').command({ ping: 1 });
+    await ensureIndexes();
+    app.listen(PORT, () => {
+      console.log(`API server listening on http://localhost:${PORT} (db: ${DB_NAME})`);
+    });
+  } catch (e) {
+    console.error('서버 시작 실패: DB 연결 확인 필요:', (e as Error).message);
+    process.exit(1);
+  }
+})();

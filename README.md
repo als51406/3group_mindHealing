@@ -1,11 +1,45 @@
-# React + TypeScript + Vite
+# TodakTalk (React + TypeScript + Vite + Express + MongoDB)
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+This project uses Vite (frontend) and a Node/Express API server with MongoDB.
 
 Currently, two official plugins are available:
 
 - [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
 - [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+
+## Setup: External MongoDB via IP
+
+1) Copy env template and fill values
+
+```
+cp .env.example .env
+# Edit .env and set:
+# - MONGO_URI: mongodb://USER:PASS@<EXTERNAL_IP>:27017/?authSource=admin
+# - DB_NAME: your DB name (default: appdb)
+# - JWT_SECRET: change to a secure value
+# - PORT: 7780 (matches Vite proxy)
+```
+
+2) Install dependencies and run API
+
+```
+npm install
+npm run server
+```
+
+3) In a separate terminal, run frontend (Vite proxy will forward /api to the API)
+
+```
+npm run dev
+```
+
+4) Health check (optional)
+
+```
+curl http://localhost:7780/api/health
+```
+
+If ok: true and db: up, your external MongoDB connection works.
 
 ## React Compiler
 
