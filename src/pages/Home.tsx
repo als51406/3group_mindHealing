@@ -3,112 +3,50 @@
 // AI와 대화할 수 있습니다.
 
 import { useNavigate } from "react-router-dom";
-import { useState } from "react";
 
 export default function Home() {
 
     // navigate: 페이지를 이동할 때 사용
     const navigate = useNavigate();
 
-    // firstPage: <1> 첫 페이지. AI와 대화를 시작할 수 있다. true일 때 활성화
-    const [firstPage, setFirstPage] = useState(true);
-
-    // AIChatPage: <2> AI와 대화를 시작하면 보이는 채팅창. true일 때 활성화
-    const [AIChatPage, setAIChatPage] = useState(false);
-
-    // savePop: <3> 대화를 저장할지 묻는 팝업. true일 때 활성화
-    const [savePop, setSavePop] = useState(false);
+    // (단순화) 첫 입력 → /chat 라우팅으로 변경됨
 
     // firstChat: 처음으로 input에서 Enter를 눌렀을 때
     const firstChat = (event: any) => {
-
         // 새로고침 방지
         event.preventDefault();
-
-        // <1> 첫 페이지 비활성화
-        setFirstPage(false);
-
-        // <2> AI 채팅창 활성화
-        setAIChatPage(true);
+        // 첫 입력 후 즉시 /chat 으로 이동
+        navigate('/chat');
     }
 
-    // chat: input에서 Enter을 눌렀을 때
-    const chat = (event: any) => {
+    // (미사용) 이전 단계 핸들러 제거
 
-        // 새로고침 방지
-        event.preventDefault();
-    }
-
-    // endChat: 대화 종료
-    const endChat = () => {
-
-        // <3> 대화 저장 팝업 활성화
-        setSavePop(true);
-    }
-
-    // saveYes: 오늘 이야기를 일기로 저장해둘까요? -> 예
-    const saveYes = (event: any) => {
-
-        // 새로고침 방지
-        event.preventDefault();
-
-        // 페이지 이동("경로");
-        navigate("/diary");
-    }
-
-    // saveNo: 오늘 이야기를 일기로 저장해둘까요? -> 아니요
-    const saveNo = (event: any) => {
-
-        // 새로고침 방지
-        event.preventDefault();
-
-        // 페이지 이동("경로");
-        navigate("/diary");
-    }
+    // (단순화) 저장 팝업 제거
 
     return (
         <>
-        <div id="homeWrap"
-        style={{width:"100%", display: "flex", flexDirection:"row", justifyContent:"center"}}>
-
-            <div className="mainview"
-            style={{width:"300px", display:"flex", flexDirection:"column", justifyContent:"center"}}>
-            <h2>초기 페이지</h2>
-
-            {/* <1> 첫 페이지 -시작- */}
-            {firstPage && (
-                <div>
-                    <p>오늘 하루는 어땠나요? 슬퍼요</p>
-                    <form onSubmit={firstChat}>
-                        <input />
-                    </form>
+        <div id="homeWrap" style={{ width: '100%', minHeight: 'calc(100vh - 56px)', display: 'grid', placeItems: 'center', background: 'linear-gradient(135deg, #f8fafc 0%, #eef2ff 100%)' }}>
+            <div className="mainview" style={{ width: 'min(720px, 92%)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 20 }}>
+                <div style={{ textAlign: 'center' }}>
+                    <div style={{ fontSize: 22, fontWeight: 800, color: '#111827' }}>오늘 하루는 어땠나요?</div>
+                    <div style={{ fontSize: 16, color: '#4b5563', marginTop: 6 }}>당신의 이야기를 들려주세요</div>
                 </div>
-            )}
-            {/* <1> 첫 페이지 -끝- */}
-
-            {/* <2> AI 채팅창 -시작- */}
-            {AIChatPage && (
-                <div>
-                    <h2>AI 채팅 페이지</h2>
-                    <form onSubmit={chat}>
-                        <input />
-                    </form>
-                    <button onClick={endChat}>대화 종료</button>
-                </div>
-            )}
-            {/* <2> AI 채팅창 -끝- */}
-
-            {/* <3> 대화 저장 팝업 -시작- */}
-            {savePop && (
-                <div>
-                    <p>오늘 이야기를 일기로 저장해둘까요?</p>
-                    <button onClick={saveYes}>예</button>
-                    <button onClick={saveNo}>아니오</button>
-                </div>
-            )}
-            {/* <3> 대화 저장 팝업 -끝- */}
+                <form onSubmit={firstChat} style={{ width: '100%', display: 'flex', justifyContent: 'center' }}>
+                    <input
+                        placeholder="한 줄로 시작해 보세요…"
+                        style={{
+                            width: '100%', maxWidth: 540,
+                            padding: '12px 16px',
+                            borderRadius: 999,
+                            border: '1px solid #e5e7eb',
+                            background: '#fff',
+                            boxShadow: 'inset 0 2px 6px rgba(0,0,0,0.04)',
+                            outline: 'none'
+                        }}
+                    />
+                </form>
             </div>
-            </div>
+        </div>
         </>
     )
 }

@@ -1,7 +1,7 @@
 // Navigation.tsx
 // 상단에 고정되어 있는 메뉴창입니다.
 
-import { useNavigate } from "react-router-dom";
+import { useNavigate, NavLink } from "react-router-dom";
 import { useEffect } from "react";
 import { useAuth } from "../hooks/useAuth";
 
@@ -44,10 +44,43 @@ export default function Navigation() {
             <h1
                 onClick={goHome}
                 title="메인으로 이동"
-                style={{ marginRight: "auto", cursor: "pointer", userSelect: "none" }}
+                style={{ cursor: "pointer", userSelect: "none" }}
             >
                 토닥톡
             </h1>
+
+            {/* 가운데 네비게이션: 다이어리 / 챗온 */}
+            <div style={{ margin: "0 auto", display: "flex", gap: 16 }}>
+                <NavLink
+                    to="/diary"
+                    style={({ isActive }) => ({
+                        padding: "6px 10px",
+                        borderRadius: 8,
+                        textDecoration: "none",
+                        border: isActive ? "1px solid #2563eb" : "1px solid transparent",
+                        background: isActive ? "#eef2ff" : "transparent",
+                        color: isActive ? "#1e3a8a" : "#111",
+                        fontWeight: 600,
+                    })}
+                >
+                    다이어리
+                </NavLink>
+                <NavLink
+                    to="/online"
+                    style={({ isActive }) => ({
+                        padding: "6px 10px",
+                        borderRadius: 8,
+                        textDecoration: "none",
+                        border: isActive ? "1px solid #2563eb" : "1px solid transparent",
+                        background: isActive ? "#eef2ff" : "transparent",
+                        color: isActive ? "#1e3a8a" : "#111",
+                        fontWeight: 600,
+                    })}
+                >
+                    챗온
+                </NavLink>
+            </div>
+
             {loading ? (
                 <span>상태 확인 중...</span>
             ) : user ? (

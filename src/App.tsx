@@ -3,6 +3,7 @@ import Navigation from './pages/Navigation';
 import Home from './pages/Home';
 import Diary from './pages/Diary';
 import Chat from './pages/Chat';
+import Online from './pages/Online';
 import Login from './pages/Login';
 import Register from './pages/Register';
 
@@ -15,6 +16,7 @@ export default function App() {
           <Route path="/" element={<Home />} />
           <Route path="/diary" element={<Diary />} />
           <Route path="/chat" element={<Chat />} />
+          <Route path="/online" element={<Online />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
         </Routes>

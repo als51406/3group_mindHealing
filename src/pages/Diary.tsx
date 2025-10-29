@@ -191,26 +191,7 @@ export default function Diary() {
 
     // 개별 메시지 삭제 기능 제거 (세션 단위 삭제만 허용)
 
-            const continueGen = async () => {
-            if (sending) return;
-            setSending(true);
-            // 타이핑 표시
-            setMessages((prev) => [...prev, { role: 'assistant', content: '…' }]);
-            try {
-                    const res = await fetch(`/api/diary/session/${selected}/continue`, { method: 'POST', credentials: 'include' });
-                if (!res.ok) {
-                    setMessages((prev) => [...prev.slice(0, -1), { role: 'assistant', content: '생성 실패. 잠시 후 다시 시도해 주세요.' }]);
-                    return;
-                }
-                const data = await res.json();
-                setMessages((prev) => [...prev.slice(0, -1), { role: 'assistant', content: data?.assistant?.content || '' }]);
-                await refreshList();
-            } catch {
-                setMessages((prev) => [...prev.slice(0, -1), { role: 'assistant', content: '네트워크 오류가 발생했습니다.' }]);
-            } finally {
-                setSending(false);
-            }
-        };
+    // '대화 추가'는 새로운 세션 생성으로 동작
 
         const Bubble = (m: DiaryMessage, i: number) => {
         const mine = m.role === 'user';
@@ -234,9 +215,9 @@ export default function Diary() {
         <div style={{ display: 'grid', gridTemplateColumns: '280px 1fr', gap: 0, minHeight: 'calc(100vh - 56px)' }}>
             {/* 좌측: 목록 + 툴바 */}
             <aside style={{ borderRight: '1px solid #e5e7eb', padding: 12 }}>
-                {/* 상단 툴바: 대화 더 생성만 */}
+                {/* 상단 툴바: 새 대화 생성 */}
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-                    <button onClick={() => void continueGen()} title="대화 더 생성" style={{ padding: '6px 10px', border: '1px solid #2563eb', borderRadius: 8, background: '#eef2ff', color: '#1e3a8a', cursor: 'pointer' }}>대화 추가</button>
+                    <button onClick={() => void createToday()} title="새 대화 생성" style={{ padding: '6px 10px', border: '1px solid #2563eb', borderRadius: 8, background: '#eef2ff', color: '#1e3a8a', cursor: 'pointer' }}>대화 추가</button>
                 </div>
 
                 <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 6 }}>날짜별 기록</div>

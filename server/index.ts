@@ -106,6 +106,8 @@ async function ensureIndexes() {
   // 세션(한 날짜에 여러 대화 허용)
   await db.collection('diary_sessions').createIndex({ userId: 1, createdAt: 1 }, { name: 'session_by_user_time' });
   await db.collection('diary_session_messages').createIndex({ sessionId: 1, createdAt: 1 }, { name: 'by_session_time' });
+  // 온라인 채팅 메시지 인덱스
+  await db.collection('online_messages').createIndex({ createdAt: 1 }, { name: 'online_by_time' });
   } catch (e) {
     console.warn('Index creation skipped:', (e as Error).message);
   }
@@ -303,6 +305,40 @@ app.get('/api/health', async (_req, res) => {
   res.json({ ok: true, db: 'up', dbName: DB_NAME });
   } catch {
     res.status(500).json({ ok: false, db: 'down' });
+  }
+});
+
+// =====================
+// Online group chat (simple)
+// =====================
+app.get('/api/online/messages', authMiddleware, async (req: any, res) => {
+  try {
+    const client = await getClient();
+    const db = client.db(DB_NAME);
+    const items = await db
+      .collection('online_messages')
+      .find({})
+      .sort({ createdAt: 1 })
+      .limit(300)
+      .toArray();
+    res.json({ ok: true, items: items.map((m: any) => ({ id: String(m._id), user: m.user, text: m.text, createdAt: m.createdAt })) });
+  } catch (e) {
+    res.status(500).json({ message: '온라인 메시지 조회 오류' });
+  }
+});
+
+app.post('/api/online/message', authMiddleware, async (req: any, res) => {
+  try {
+    const text = String(req.body?.text || '').trim();
+    if (!text) return res.status(400).json({ message: 'text가 필요합니다.' });
+    const client = await getClient();
+    const db = client.db(DB_NAME);
+    const user = String(req.user?.email || '익명');
+    const doc = { user, text, createdAt: new Date() };
+    const r = await db.collection('online_messages').insertOne(doc);
+    res.status(201).json({ ok: true, id: String(r.insertedId) });
+  } catch (e) {
+    res.status(500).json({ message: '온라인 메시지 저장 오류' });
   }
 });
 
