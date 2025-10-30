@@ -46,7 +46,7 @@ async function chatCompletionWithFallback(openai: OpenAI, messages: Array<{ role
     const msg = e?.message || '';
     const status = e?.status || e?.code;
     const notFound = /model\s?.*does not exist|unknown model|not found/i.test(msg) || status === 404;
-    if (notFound && preferred !== 'gpt-4o-mini') {
+    if (notFound && preferred !== 'gpt-4.1-nano') {
       // 모델 미존재 시 gpt-4.1-nano로 폴백
   return await openai.chat.completions.create({ model: 'gpt-4.1-nano', messages: [
         ...messages.map((m: any) => ({ role: m.role, content: String(m.content) })),
