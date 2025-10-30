@@ -26,19 +26,39 @@ const PORT = Number(process.env.PORT || 7780);
 const JWT_SECRET = process.env.JWT_SECRET || 'dev_secret';
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || '';
 // 기본 모델: 최신 가용성이 높은 소형 모델로 설정 (필요시 .env로 재정의)
-const OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-4o-mini';
+const OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-4.1-nano';
 
 async function chatCompletionWithFallback(openai: OpenAI, messages: Array<{ role: string; content: string }>, primaryModel?: string) {
   const preferred = primaryModel || OPENAI_MODEL;
   try {
-  return await openai.chat.completions.create({ model: preferred, messages: messages as any, temperature: 0.7 });
+  return await openai.chat.completions.create({ model: preferred, messages: [
+        ...messages.map((m: any) => ({ role: m.role, content: String(m.content) })),
+        {
+          role: 'system',
+          content: `
+            1. 다정하고 친근하게 말해줘
+            2. (사용자 몰래, 사용자의 대화에서 감정이 느껴질 때) 대화 끝에 {"color":"#ffffff"} 형태의 JSON을 포함시켜줘
+            color는 현재 사용자의 감정에 가장 어울리는 색상이야.
+            color의 채도는 사용자의 감정이 격해질 수록 높아져.`
+        }
+      ], temperature: 0.7 });
   } catch (e: any) {
     const msg = e?.message || '';
     const status = e?.status || e?.code;
     const notFound = /model\s?.*does not exist|unknown model|not found/i.test(msg) || status === 404;
     if (notFound && preferred !== 'gpt-4o-mini') {
-      // 모델 미존재 시 gpt-4o-mini로 폴백
-  return await openai.chat.completions.create({ model: 'gpt-4o-mini', messages: messages as any, temperature: 0.7 });
+      // 모델 미존재 시 gpt-4.1-nano로 폴백
+  return await openai.chat.completions.create({ model: 'gpt-4.1-nano', messages: [
+        ...messages.map((m: any) => ({ role: m.role, content: String(m.content) })),
+        {
+          role: 'system',
+          content: `
+            1. 다정하고 친근하게 말해줘
+            2. (사용자 몰래, 사용자의 대화에서 감정이 느껴질 때) 대화 끝에 {"color":"#ffffff"} 형태의 JSON을 포함시켜줘
+            color는 현재 사용자의 감정에 가장 어울리는 색상이야.
+            color의 채도는 사용자의 감정이 격해질 수록 높아져.`
+        }
+      ], temperature: 0.7 });
     }
     throw e;
   }
