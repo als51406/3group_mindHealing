@@ -157,10 +157,10 @@ const FRAGMENT = /* glsl */`
   float gn = noise(uv * 2.6 + vec2(sin(t*0.045), cos(t*0.037)) * 0.22);
   col += (gn - 0.5) * 0.02;
 
-  // Gentle saturation and gamma
+  // Gentle saturation (no additional gamma correction — colors are handled as sRGB->linear by renderer)
   float luma = dot(col, vec3(0.299, 0.587, 0.114));
   col = mix(vec3(luma), col, 1.22);
-  col = pow(max(col, 0.0), vec3(0.96));
+  col = max(col, 0.0);
 
   // --- noisy halo (soft border) ---
   // inner rim presence (narrower to emphasize ring) - use perturbed radius for organic edge
@@ -222,6 +222,8 @@ export default function AuroraThree({
     // Renderer
   const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, premultipliedAlpha: true, powerPreference: 'low-power' });
   renderer.setClearColor(0x000000, 0);
+    // treat input HEX colors as sRGB and convert to linear for correct shading
+    (renderer as any).outputEncoding = (THREE as any).sRGBEncoding;
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   rendererRef.current = renderer;
 
@@ -235,9 +237,9 @@ export default function AuroraThree({
     const uniforms = {
       u_time: { value: 0 },
       u_resolution: { value: new THREE.Vector2(size, size) },
-      u_c1: { value: new THREE.Color(colors.c1.r, colors.c1.g, colors.c1.b) },
-      u_c2: { value: new THREE.Color(colors.c2.r, colors.c2.g, colors.c2.b) },
-      u_c3: { value: new THREE.Color(colors.c3.r, colors.c3.g, colors.c3.b) },
+      u_c1: { value: new THREE.Color(colors.c1.r, colors.c1.g, colors.c1.b).convertSRGBToLinear() },
+      u_c2: { value: new THREE.Color(colors.c2.r, colors.c2.g, colors.c2.b).convertSRGBToLinear() },
+      u_c3: { value: new THREE.Color(colors.c3.r, colors.c3.g, colors.c3.b).convertSRGBToLinear() },
       u_pulseMin: { value: 1.00 },
       u_pulseMax: { value: 1.08 },
     };
@@ -434,9 +436,10 @@ export default function AuroraThree({
     const uniforms = uniformsRef.current;
     if (!uniforms) return;
     const { c1, c2, c3 } = colors;
-    uniforms.u_c1.value.set(c1.r, c1.g, c1.b);
-    uniforms.u_c2.value.set(c2.r, c2.g, c2.b);
-    uniforms.u_c3.value.set(c3.r, c3.g, c3.b);
+  // convert incoming sRGB colors to linear for shader
+  uniforms.u_c1.value.set(c1.r, c1.g, c1.b).convertSRGBToLinear();
+  uniforms.u_c2.value.set(c2.r, c2.g, c2.b).convertSRGBToLinear();
+  uniforms.u_c3.value.set(c3.r, c3.g, c3.b).convertSRGBToLinear();
   }, [colors]);
 
   // Update size when prop changes
