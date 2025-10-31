@@ -730,6 +730,7 @@ type DiarySession = {
   userId: string;
   date: string; // YYYY-MM-DD
   title?: string;
+  type?: 'ai' | 'online'; // 세션 타입: AI 대화 또는 온라인 채팅
   mood?: { emotion: string; score: number; color: string } | null;
   createdAt: Date;
   lastUpdatedAt: Date;
@@ -742,7 +743,9 @@ app.post('/api/diary/session', authMiddleware, async (req: any, res) => {
     const db = client.db(DB_NAME);
     const userId = req.user.sub;
     const date = (req.body?.date && /^\d{4}-\d{2}-\d{2}$/.test(req.body.date)) ? req.body.date : toDateKey(new Date());
-    const doc: DiarySession = { userId, date, title: '', mood: null, createdAt: new Date(), lastUpdatedAt: new Date() };
+    const type = (req.body?.type === 'online') ? 'online' : 'ai'; // 기본값: ai
+    const title = String(req.body?.title || '').slice(0, 100);
+    const doc: DiarySession = { userId, date, title, type, mood: null, createdAt: new Date(), lastUpdatedAt: new Date() };
     const r = await db.collection('diary_sessions').insertOne(doc);
     res.status(201).json({ ok: true, id: String(r.insertedId) });
   } catch (e) {
@@ -750,15 +753,27 @@ app.post('/api/diary/session', authMiddleware, async (req: any, res) => {
   }
 });
 
-// GET /api/diary/sessions
+// GET /api/diary/sessions?type=ai|online (type 필터 선택 가능)
 app.get('/api/diary/sessions', authMiddleware, async (req: any, res) => {
   try {
     const client = await getClient();
     const db = client.db(DB_NAME);
     const userId = req.user.sub;
+    const typeFilter = req.query.type;
+    const query: any = { userId };
+    
+    // type 필터가 있으면 적용
+    if (typeFilter === 'ai') {
+      // AI 대화: type이 'ai'이거나 type이 없는 것(기존 세션)
+      query.$or = [{ type: 'ai' }, { type: { $exists: false } }, { type: null }];
+    } else if (typeFilter === 'online') {
+      // 온라인 채팅: type이 정확히 'online'인 것만
+      query.type = 'online';
+    }
+    
     const sessions = await db
       .collection('diary_sessions')
-      .find({ userId })
+      .find(query)
       .sort({ lastUpdatedAt: -1 })
       .limit(300)
       .toArray();
@@ -772,7 +787,7 @@ app.get('/api/diary/sessions', authMiddleware, async (req: any, res) => {
     const map = new Map<string, any>();
     for (const p of previews) map.set(String(p._id), p.last);
     res.json({ ok: true, items: sessions.map((s: any) => ({
-      _id: String(s._id), date: s.date, title: s.title || '', mood: s.mood || null, lastUpdatedAt: s.lastUpdatedAt,
+      _id: String(s._id), date: s.date, title: s.title || '', type: s.type, mood: s.mood || null, lastUpdatedAt: s.lastUpdatedAt,
       preview: (map.get(String(s._id))?.content || '').slice(0, 80),
     })) });
   } catch (e) {
@@ -1099,13 +1114,139 @@ app.get('/api/debug/list-collections', async (_req, res) => {
   }
 });
 
+// ----------------------- # 실시간 1대1 매칭 -시작- -----------------------
+// 작성자: 송창하
+// socket.io(실시간 통신)와 http 서버를 위한 모듈 가져오기
+import { Server } from "socket.io";
+import http from "http";
+
+// 기존의 express 앱(app)을 http 서버로 감싸서 socket.io와 함께 사용 가능
+const httpServer = http.createServer(app);
+
+// socket.io 서버 생성
+// cors를 *로 설정시 모든 도메인에서 접속 가능
+const server = new Server(httpServer, { cors: { origin: "*" } });
+
+// waitingUser: 현재 매칭을 기다리고 있는 사용자
+let waitingUser: string | null = null;
+
+// ------------------------- # connection -시작- -------------------------
+// 클라이언트 -> 서버 (connection)
+server.on("connection", (client) => {
+
+  // -log-
+  console.log(`새 사용자 접속: ${client.id}`);
+
+  // ----------------- # startMatching -시작- -----------------
+  // 클라이언트 -> 서버 (startMatching)
+  client.on("startMatching", () => {
+
+    // -log-
+    console.log(`${client.id} 매칭 요청`)
+
+    // 이미 매칭 대기 중인 다른 클라이언트가 있을 때 (1/2명 -> 2/2명)
+    if (waitingUser) {
+
+      // roomId: 두 클라이언트가 들어갈 방 ID 값
+      const roomId = `${waitingUser}_${client.id}`;
+
+      // 두 클라이언트를 roomId방 안에 넣기
+      server.sockets.sockets.get(waitingUser)?.join(roomId);
+      client.join(roomId);
+
+      // (1번 이벤트 루프를 건너뛴 다음) 두 클라이언트에게 matched 이벤트 보내기 (1대1 채팅 매칭 성공)
+      setTimeout(() => {
+        server.to(roomId).emit("matched", { roomId, users: [waitingUser, client.id] });
+      }, 0)
+
+      // -log-
+      console.log(`매칭 완료: ${waitingUser} - ${client.id}`);
+
+      // 대기열 비우기
+      waitingUser = null;
+
+    }
+    // 매칭 대기 중인 다른 클라이언트가 없을 때 (0/2명 -> 1/2명)
+    else {
+
+      // 현재 클라이언트를 대기열에 등록
+      waitingUser = client.id;
+    }
+  })
+  // ----------------- # startMatching -끝- -----------------
+
+  // 클라이언트 -> 서버 (chat): 같은 방에 있는 사람에게 메시지 전달
+  client.on("chat", async ({ roomId, text }) => {
+
+    const openai = new OpenAI({ apiKey: OPENAI_API_KEY });
+
+    // OpenAI에게 메시지에 담긴 감정을 색상으로 변환해 달라고 하기
+    const airesponse = await openai.chat.completions.create({
+      model: "gpt-4.1-nano",
+      messages: [
+        {
+          role: "system",
+          content: `사용자가 입력한 문장의 감정을 파악하고 감정에 어울리는 색상을 {"color":"#ffffff"} 형태로 만들어`
+        },
+        {
+          role: "user",
+          content: text
+        }
+      ],
+      temperature: 0
+    });
+
+    // aiContent: openai의 답변
+    let aiContent = airesponse.choices[0].message.content;
+
+    // json: aicontent에 포함한 json
+    const jsonMatch = aiContent?.match(/\{[^}]+\}/);
+
+    // 채팅 말풍선 색상 기본값
+    let color = "#aaaaaa";
+
+    // 만약 AI 메시지에서 json이 포함되어 있다면
+    if (jsonMatch) {
+
+      // AI 메시지에서 json 추출 시도
+      const json = JSON.parse(jsonMatch[0]);
+
+      // json에 color 속성이 있을 때
+      if (json.color) {
+
+        // 채팅 말풍선 색상 변경
+        color = json.color;
+      }
+    }
+
+    console.log(color);
+
+    // 해당 room에 속한 모든 클라이언트에게 메시지 전송
+    server.to(roomId).emit("chat", { user: client.id, text, color });
+  }
+  );
+
+  // 클라이언트 -> 서버 (disconnect): 연결 종료
+  client.on("disconnect", () => {
+
+    // -log-
+    console.log(`연결 종료: ${client.id}`);
+
+    // 만약 대기열에 있던 클라이언트라면 대기열 비우기
+    if (client.id == waitingUser) waitingUser = null;
+  });
+
+});
+// ------------------------- # connection -끝- -------------------------
+// ----------------------- # 실시간 1대1 매칭 -끝- -----------------------
+
 // Start only after confirming DB readiness
 (async () => {
   try {
     const client = await getClient();
     await client.db('admin').command({ ping: 1 });
     await ensureIndexes();
-    app.listen(PORT, () => {
+    httpServer.listen(PORT, () => {
       console.log(`API server listening on http://localhost:${PORT} (db: ${DB_NAME})`);
     });
   } catch (e) {

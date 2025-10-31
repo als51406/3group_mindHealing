@@ -1,0 +1,114 @@
+/* DiaryCalendar.css — 일기 달력 전용 스타일 */
+
+.diary-calendar-container {
+  background: #fff;
+  border-radius: 12px;
+  padding: 8px;
+  margin-bottom: 16px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+/* react-calendar 기본 스타일 오버라이드 */
+.react-calendar {
+  width: 100%;
+  border: none;
+  font-family: inherit;
+  font-size: 14px;
+}
+
+.react-calendar__month-view__weekdays {
+  text-align: center;
+  font-weight: 600;
+  color: #374151;
+  font-size: 12px;
+}
+
+.react-calendar__month-view__weekdays__weekday {
+  padding: 8px 0;
+}
+
+.react-calendar__tile {
+  padding: 10px 6px;
+  border-radius: 8px;
+  font-weight: 600;
+  transition: all 0.2s ease;
+  position: relative;
+}
+
+.react-calendar__tile:hover {
+  background: #f3f4f6;
+}
+
+.react-calendar__tile--now {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+.react-calendar__tile--active {
+  background: #6366f1;
+  color: #fff;
+}
+
+.react-calendar__tile--active:enabled:hover {
+  background: #4f46e5;
+}
+
+.react-calendar__navigation {
+  margin-bottom: 16px;
+}
+
+.react-calendar__navigation button {
+  font-size: 16px;
+  font-weight: 700;
+  color: #374151;
+  padding: 8px 12px;
+  border-radius: 8px;
+  transition: all 0.2s ease;
+}
+
+.react-calendar__navigation button:hover {
+  background: #f3f4f6;
+}
+
+.react-calendar__navigation button:disabled {
+  background: transparent;
+  opacity: 0.5;
+}
+
+/* 일기가 있는 날짜에 포인트 표시 */
+.calendar-tile-has-entries::before {
+  content: '';
+  position: absolute;
+  bottom: 4px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 4px;
+  height: 4px;
+  background: #10b981;
+  border-radius: 50%;
+}
+
+.calendar-tile-has-entries-selected::before {
+  content: '';
+  position: absolute;
+  bottom: 4px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 6px;
+  height: 6px;
+  background: #fff;
+  border-radius: 50%;
+}
+
+.calendar-tile-selected {
+  background: #6366f1 !important;
+  color: #fff !important;
+}
+
+/* 비활성화된 날짜 */
+.react-calendar__tile:disabled {
+  background: #f9fafb;
+  color: #d1d5db;
+  cursor: not-allowed;
+}
+

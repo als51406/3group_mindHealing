@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom"; // 페이지 이동용 훅
 import { useAuth } from "../hooks/useAuth"; // 로그인 상태 관리용 커스텀 훅
 import { createGradientStyle } from "../utils/colorUtils"; // 그라데이션 생성 유틸리티
+import { useToast } from "../components/Toast"; // Toast 알림 시스템
 import "./Chat.css";
 
 // AiMsg 타입 정의: 한 줄의 메시지를 나타냄
@@ -14,6 +15,7 @@ export default function Chat() {
     const navigate = useNavigate(); // 로그인 안 된 사용자를 리다이렉트하기 위해 사용
     const location = useLocation(); // Home에서 전달된 state를 받기 위해 사용
     const { user, loading } = useAuth(); // 로그인 상태 확인
+    const { showToast, ToastContainer } = useToast(); // Toast 알림
     const [msgs, setMsgs] = useState<AiMsg[]>([
         // 초기 메시지(첫 인사)
         { role: 'assistant', content: '안녕하세요! 무엇을 도와드릴까요?' },
@@ -281,14 +283,14 @@ export default function Chat() {
         
         // 로그인 상태 확인
         if (!user) {
-            alert('로그인이 필요합니다. 다시 로그인해주세요.');
-            navigate('/login');
+            showToast({ message: '로그인이 필요합니다. 다시 로그인해주세요.', type: 'warning', duration: 3000 });
+            setTimeout(() => navigate('/login'), 1500);
             return;
         }
         
         // 인사 메시지만 있는 경우 저장하지 않음
         if (msgs.length <= 1) {
-            alert('저장할 대화 내용이 없습니다.');
+            showToast({ message: '저장할 대화 내용이 없습니다.', type: 'info', duration: 2500 });
             return;
         }
         
@@ -308,7 +310,7 @@ export default function Chat() {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 credentials: 'include',
-                body: JSON.stringify({ date: dateKey })
+                body: JSON.stringify({ date: dateKey, type: 'ai' }) // AI 대화 타입 명시
             });
             
             if (!createRes.ok) {
@@ -346,9 +348,15 @@ export default function Chat() {
             const importData = await importRes.json();
             console.log('✅ 저장 성공:', importData);
             
-            // 3. 성공 알림 및 다이어리 페이지로 이동 여부 묻기
-            const goToDiary = confirm(`${importData.imported}개의 메시지가 다이어리에 저장되었습니다!\n\n다이어리 페이지로 이동하시겠습니까?`);
+            // 3. 성공 알림
+            showToast({ 
+                message: `${importData.imported}개의 메시지가 다이어리에 저장되었습니다! 🎉`, 
+                type: 'success', 
+                duration: 3500 
+            });
             
+            // 4. 다이어리 페이지로 이동 여부 묻기
+            const goToDiary = confirm('다이어리 페이지로 이동하시겠습니까?');
             if (goToDiary) {
                 navigate('/diary');
             }
@@ -356,7 +364,7 @@ export default function Chat() {
         } catch (error) {
             console.error('❌ 다이어리 저장 에러:', error);
             const errorMsg = error instanceof Error ? error.message : '다이어리 저장 중 오류가 발생했습니다.';
-            alert(errorMsg);
+            showToast({ message: errorMsg, type: 'error', duration: 4000 });
         } finally {
             setSavingToDiary(false);
         }
@@ -397,6 +405,7 @@ export default function Chat() {
 
                 {/* 메시지 본문 (파란색: 내 메시지, 회색: AI 메시지) */}
                 <div
+                    className="chat-bubble"
                     style={{
                         maxWidth: '70%',
                         whiteSpace: 'pre-wrap',
@@ -444,10 +453,13 @@ export default function Chat() {
     };
 
     return (
-        <div style={{ maxWidth: 720, margin: '0 auto', padding: '24px 16px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', margin: '8px 0 16px' }}>
-                <h2 style={{ textAlign: 'center', margin: 0, flex: 1 }}>AI 채팅 페이지</h2>
+        <>
+            <ToastContainer />
+            <div className="chat-container" style={{ maxWidth: 720, margin: '0 auto', padding: '24px 16px' }}>
+                <div className="chat-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', margin: '8px 0 16px' }}>
+                    <h2 style={{ textAlign: 'center', margin: 0, flex: 1 }}>AI 채팅 페이지</h2>
                 <button
+                    className="chat-save-button"
                     onClick={() => void saveToDiary()}
                     disabled={savingToDiary || msgs.length <= 1}
                     style={{
@@ -472,6 +484,7 @@ export default function Chat() {
 
             {/* 채팅 메시지 영역 */}
             <div
+                className="chat-message-area"
                 style={{
                     border: '1px solid rgba(255, 255, 255, 0.3)',
                     borderRadius: 16,
@@ -535,6 +548,7 @@ export default function Chat() {
 
             {/* 입력창 + 전송 버튼 */}
             <form
+                className="chat-input-form"
                 onSubmit={(e) => {
                     e.preventDefault();
                     void send(); // 엔터로 전송
@@ -580,5 +594,6 @@ export default function Chat() {
                 </button>
             </form>
         </div>
+        </>
     );
 }

@@ -1,0 +1,14 @@
+/* Online.css — 온라인 채팅 페이지 전용 스타일 */
+
+/* pulse 애니메이션 */
+@keyframes pulse {
+  0%, 100% {
+    opacity: 0.6;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.1);
+  }
+}
+

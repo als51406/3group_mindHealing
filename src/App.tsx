@@ -1,5 +1,6 @@
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import './App.css';
+import './styles/responsive.css'; // 모바일 반응형 스타일
 import Navigation from './pages/Navigation';
 import Home from './pages/Home';
 import Diary from './pages/Diary';

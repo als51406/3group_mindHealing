@@ -31,11 +31,12 @@ export default function Home() {
         <div id="homeWrap" style={{ width: '100%', minHeight: 'calc(100vh - 56px)', display: 'grid', placeItems: 'center', background: 'linear-gradient(135deg, #f8fafc 0%, #eef2ff 100%)' }}>
             <div className="mainview" style={{ width: 'min(720px, 92%)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 20 }}>
                 <div style={{ textAlign: 'center' }}>
-                    <div style={{ fontSize: 22, fontWeight: 800, color: '#111827' }}>오늘 하루는 어땠나요?</div>
-                    <div style={{ fontSize: 16, color: '#4b5563', marginTop: 6 }}>당신의 이야기를 들려주세요</div>
+                    <div className="home-title" style={{ fontSize: 22, fontWeight: 800, color: '#111827' }}>오늘 하루는 어땠나요?</div>
+                    <div className="home-subtitle" style={{ fontSize: 16, color: '#4b5563', marginTop: 6 }}>당신의 이야기를 들려주세요</div>
                 </div>
                 <form onSubmit={firstChat} style={{ width: '100%', display: 'flex', justifyContent: 'center' }}>
                     <input
+                        className="home-input"
                         value={inputText}
                         onChange={(e) => setInputText(e.target.value)}
                         placeholder="한 줄로 시작해 보세요…"

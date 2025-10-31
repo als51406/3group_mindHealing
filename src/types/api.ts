@@ -4,6 +4,7 @@ export interface DiarySessionResponse {
   _id: string;
   date: string;
   title?: string;
+  type?: 'ai' | 'online'; // 세션 타입
   mood?: { emotion: string; score: number; color: string } | null;
   lastUpdatedAt: string;
   preview?: string;
