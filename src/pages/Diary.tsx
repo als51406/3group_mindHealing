@@ -21,11 +21,14 @@ export default function Diary() {
     const navigate = useNavigate();
     const { user, loading } = useAuth();
 
-        const [list, setList] = useState<DiaryListItem[]>([]); // 세션 목록
-        const [selected, setSelected] = useState<string>(''); // 선택된 세션 ID
-        const [selectedDate, setSelectedDate] = useState<string>(todayKey());
+    // 탭 관리: 'ai' (AI 대화) 또는 'online' (온라인 채팅)
+    const [activeTab, setActiveTab] = useState<'ai' | 'online'>('ai');
+
+    const [list, setList] = useState<DiaryListItem[]>([]); // 세션 목록
+    const [selected, setSelected] = useState<string>(''); // 선택된 세션 ID
+    const [selectedDate, setSelectedDate] = useState<string>(todayKey());
     const [messages, setMessages] = useState<DiaryMessage[]>([]);
-            // 제목 기능 제거: 더 이상 사용하지 않음
+    // 제목 기능 제거: 더 이상 사용하지 않음
     const [mood, setMood] = useState<{ emotion: string; score: number; color: string } | null>(null);
     const [input, setInput] = useState('');
     const [sending, setSending] = useState(false);
@@ -213,18 +216,69 @@ export default function Diary() {
     return (
         <div style={{ display: 'grid', gridTemplateColumns: '280px 1fr', gap: 0, minHeight: 'calc(100vh - 56px)' }}>
             {/* 좌측: 목록 + 툴바 */}
-            <aside style={{ borderRight: '1px solid #e5e7eb', padding: 12 }}>
-                {/* 상단 툴바: 새 대화 생성 */}
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-                    <button onClick={() => void createToday()} title="새 대화 생성" style={{ padding: '6px 10px', border: '1px solid #2563eb', borderRadius: 8, background: '#eef2ff', color: '#1e3a8a', cursor: 'pointer' }}>대화 추가</button>
+            <aside style={{ borderRight: '1px solid #e5e7eb', padding: 12, background: '#fafafa' }}>
+                {/* 탭 전환 버튼 */}
+                <div style={{ display: 'flex', gap: 6, marginBottom: 12, background: '#fff', borderRadius: 10, padding: 4, border: '1px solid #e5e7eb' }}>
+                    <button
+                        onClick={() => setActiveTab('ai')}
+                        style={{
+                            flex: 1,
+                            padding: '8px 12px',
+                            border: 'none',
+                            borderRadius: 8,
+                            background: activeTab === 'ai' ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' : 'transparent',
+                            color: activeTab === 'ai' ? '#fff' : '#6b7280',
+                            fontWeight: 600,
+                            cursor: 'pointer',
+                            transition: 'all 0.3s ease',
+                            fontSize: 13,
+                        }}
+                    >
+                        🤖 AI 대화
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('online')}
+                        style={{
+                            flex: 1,
+                            padding: '8px 12px',
+                            border: 'none',
+                            borderRadius: 8,
+                            background: activeTab === 'online' ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' : 'transparent',
+                            color: activeTab === 'online' ? '#fff' : '#6b7280',
+                            fontWeight: 600,
+                            cursor: 'pointer',
+                            transition: 'all 0.3s ease',
+                            fontSize: 13,
+                        }}
+                    >
+                        💬 온라인 채팅
+                    </button>
                 </div>
 
-                <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 6 }}>날짜별 기록</div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 6, overflowY: 'auto', maxHeight: 'calc(100vh - 120px)' }}>
-                    {list.length === 0 && (
-                        <div style={{ color: '#9ca3af', fontSize: 14 }}>아직 기록이 없습니다. 첫 대화를 시작해 보세요.</div>
-                    )}
-                    {list.map((item) => {
+                {/* AI 대화 탭 */}
+                {activeTab === 'ai' && (
+                    <>
+                        {/* 상단 툴바: 새 대화 생성 */}
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                            <button onClick={() => void createToday()} title="새 대화 생성" style={{ padding: '6px 10px', border: '1px solid #2563eb', borderRadius: 8, background: '#eef2ff', color: '#1e3a8a', cursor: 'pointer', fontSize: 13 }}>대화 추가</button>
+                        </div>
+                        <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 6 }}>날짜별 AI 대화</div>
+                    </>
+                )}
+
+                {/* 온라인 채팅 탭 */}
+                {activeTab === 'online' && (
+                    <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 6 }}>온라인 채팅 기록</div>
+                )}
+                {/* AI 대화 목록 */}
+                {activeTab === 'ai' && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, overflowY: 'auto', maxHeight: 'calc(100vh - 180px)' }}>
+                        {list.length === 0 && (
+                            <div style={{ color: '#9ca3af', fontSize: 13, padding: '12px 8px', background: '#fff', borderRadius: 8 }}>
+                                아직 AI 대화 기록이 없습니다.<br/>첫 대화를 시작해 보세요! 🌟
+                            </div>
+                        )}
+                        {list.map((item) => {
                         const active = item._id === selected;
                         return (
                             <div
@@ -256,9 +310,24 @@ export default function Diary() {
                                     <div style={{ color: '#6b7280', fontSize: 12, marginTop: 4 }}>{item.preview}</div>
                                 )}
                             </div>
-                        );
-                    })}
-                </div>
+                            );
+                        })}
+                    </div>
+                )}
+
+                {/* 온라인 채팅 목록 */}
+                {activeTab === 'online' && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, overflowY: 'auto', maxHeight: 'calc(100vh - 180px)' }}>
+                        <div style={{ color: '#9ca3af', fontSize: 13, padding: '12px 8px', background: '#fff', borderRadius: 8, textAlign: 'center' }}>
+                            💬<br/>
+                            온라인 채팅 기록 기능은<br/>
+                            곧 출시됩니다!<br/>
+                            <div style={{ fontSize: 11, marginTop: 8, color: '#d1d5db' }}>
+                                (1:1 매칭 채팅 후 저장 가능)
+                            </div>
+                        </div>
+                    </div>
+                )}
             </aside>
 
             {/* 우측: 대화 + 배경색 */}

@@ -4,8 +4,23 @@ body[data-chat-bg] {
     overflow: hidden;
 }
 
-/* 배경 그라데이션 레이어 */
+/* 이전 배경 그라데이션 레이어 (기존 색상) */
 body[data-chat-bg]::before {
+    content: '';
+    position: fixed;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: var(--chat-gradient-old, var(--chat-gradient, linear-gradient(135deg, #667eea 0%, #764ba2 100%)));
+    animation: gradientRotate 8s ease-in-out infinite;
+    z-index: -2;
+    opacity: var(--old-opacity, 1);
+    transition: opacity 2.5s ease-out;
+}
+
+/* 새로운 배경 그라데이션 레이어 (서서히 나타나는 새 색상) */
+body[data-chat-bg]::after {
     content: '';
     position: fixed;
     top: -50%;
@@ -15,7 +30,8 @@ body[data-chat-bg]::before {
     background: var(--chat-gradient, linear-gradient(135deg, #667eea 0%, #764ba2 100%));
     animation: gradientRotate 8s ease-in-out infinite;
     z-index: -1;
-    transition: background 1.5s ease;
+    opacity: var(--new-opacity, 0);
+    transition: opacity 3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 /* 회전하는 그라데이션 애니메이션 */
@@ -34,32 +50,6 @@ body[data-chat-bg]::before {
     }
     100% {
         transform: rotate(360deg) scale(1);
-    }
-}
-
-/* 추가 레이어: 부드러운 오버레이 효과 */
-body[data-chat-bg]::after {
-    content: '';
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: radial-gradient(circle at var(--mouse-x, 50%) var(--mouse-y, 50%), 
-                rgba(255, 255, 255, 0.1) 0%, 
-                transparent 50%);
-    pointer-events: none;
-    z-index: -1;
-    animation: pulse 8s ease-in-out infinite;
-}
-
-/* 부드러운 펄스 효과 */
-@keyframes pulse {
-    0%, 100% {
-        opacity: 0.25;
-    }
-    50% {
-        opacity: 0.7;
     }
 }
 

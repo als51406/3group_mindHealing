@@ -173,8 +173,11 @@ export default function AuroraThree({
   const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, premultipliedAlpha: true, powerPreference: 'low-power' });
   renderer.setClearColor(0x000000, 0);
     // treat input HEX colors as sRGB and convert to linear for correct shading
-    // Note: outputEncoding is deprecated in newer Three.js versions but kept for compatibility
-    if ('outputEncoding' in renderer) {
+    // Use outputColorSpace for newer Three.js versions (r152+)
+    if ('outputColorSpace' in renderer) {
+      renderer.outputColorSpace = THREE.SRGBColorSpace;
+    } else if ('outputEncoding' in renderer) {
+      // Fallback for older versions
       (renderer as { outputEncoding: number }).outputEncoding = 3001; // THREE.sRGBEncoding
     }
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));

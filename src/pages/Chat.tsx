@@ -197,9 +197,37 @@ export default function Chat() {
                         // Chat 페이지 전용 표시자 설정
                         try { document.body.dataset.chatBg = '1'; } catch {}
                         
-                        // 생동감 있는 그라데이션 생성 및 적용
-                        const gradientStyle = createGradientStyle(json.color);
-                        document.body.style.setProperty('--chat-gradient', gradientStyle);
+                        // 생동감 있는 그라데이션 생성
+                        const newGradientStyle = createGradientStyle(json.color);
+                        
+                        // 현재 그라데이션을 이전 그라데이션으로 저장
+                        const currentGradient = getComputedStyle(document.body).getPropertyValue('--chat-gradient');
+                        if (currentGradient) {
+                            document.body.style.setProperty('--chat-gradient-old', currentGradient);
+                        }
+                        
+                        // 애니메이션 리셋: 새 그라데이션 준비
+                        document.body.style.setProperty('--new-opacity', '0');
+                        document.body.style.setProperty('--old-opacity', '1');
+                        
+                        // 새 그라데이션 설정
+                        document.body.style.setProperty('--chat-gradient', newGradientStyle);
+                        
+                        // 약간의 딜레이 후 전환 시작 (DOM 업데이트 대기)
+                        requestAnimationFrame(() => {
+                            requestAnimationFrame(() => {
+                                // 중간부터 가장자리로 퍼지는 효과 시작
+                                document.body.style.setProperty('--new-opacity', '1');
+                                document.body.style.setProperty('--old-opacity', '0');
+                            });
+                        });
+                        
+                        // 3초 후 정리 (애니메이션 완료 후)
+                        setTimeout(() => {
+                            document.body.style.setProperty('--chat-gradient-old', newGradientStyle);
+                            document.body.style.setProperty('--new-opacity', '0');
+                            document.body.style.setProperty('--old-opacity', '1');
+                        }, 3000);
 
                         // 네비게이션(nav)이 투명(배경 없음)이라면 반투명 흰색 배경을 적용
                         const nav = document.querySelector('nav') as HTMLElement | null;
