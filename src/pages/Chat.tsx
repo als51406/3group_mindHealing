@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom"; // 페이지 이동용 훅
 import { useAuth } from "../hooks/useAuth"; // 로그인 상태 관리용 커스텀 훅
+import { createGradientStyle } from "../utils/colorUtils"; // 그라데이션 생성 유틸리티
 import "./Chat.css";
 
 // AiMsg 타입 정의: 한 줄의 메시지를 나타냄
@@ -20,6 +21,7 @@ export default function Chat() {
     const [input, setInput] = useState(""); // 사용자가 입력 중인 텍스트
     const [sending, setSending] = useState(false); // 메시지 전송 중 여부
     const [typing, setTyping] = useState(false); // AI가 "답변 생성 중" 상태 표시용
+    const [savingToDiary, setSavingToDiary] = useState(false); // 다이어리 저장 중 여부
     const bottomRef = useRef<HTMLDivElement | null>(null); // 스크롤 맨 아래로 이동시키기 위한 참조
     // 이전에 변경한 바디/네비(nav) 배경을 저장해서 컴포넌트 언마운트 시 복원하기 위한 레퍼런스
     const prevBodyBgRef = useRef<string | null>(null);
@@ -57,14 +59,18 @@ export default function Chat() {
         return () => {
             try {
                 if (prevBodyBgRef.current !== null) {
-                    document.body.style.backgroundColor = prevBodyBgRef.current || '';
+                    document.body.style.background = prevBodyBgRef.current || '';
+                    document.body.style.removeProperty('--chat-gradient');
                     prevBodyBgRef.current = null;
                 }
+                // chat 배경 표시자 제거
+                try { delete document.body.dataset.chatBg; } catch {}
+                
                 if (navChangedRef.current) {
                     const nav = document.querySelector('nav') as HTMLElement | null;
                     if (nav) {
-                        // 복원할 이전 inline 스타일이 있다면 복원, 없으면 빈 문자열로 초기화
                         nav.style.backgroundColor = prevNavBgRef.current || '';
+                        nav.style.backdropFilter = '';
                     }
                     prevNavBgRef.current = null;
                     navChangedRef.current = false;
@@ -185,14 +191,17 @@ export default function Chat() {
                     try {
                         // 바디 배경을 변경하기 전에 이전 값을 저장
                         if (prevBodyBgRef.current === null) {
-                            prevBodyBgRef.current = document.body.style.backgroundColor || '';
+                            prevBodyBgRef.current = document.body.style.background || '';
                         }
-                        // Chat 페이지 전용 표시자 설정 (다른 페이지에서 흰색 강제화에 사용)
+                        
+                        // Chat 페이지 전용 표시자 설정
                         try { document.body.dataset.chatBg = '1'; } catch {}
-                        document.body.style.backgroundColor = json.color;
+                        
+                        // 생동감 있는 그라데이션 생성 및 적용
+                        const gradientStyle = createGradientStyle(json.color);
+                        document.body.style.setProperty('--chat-gradient', gradientStyle);
 
-                        // 네비게이션(nav)이 투명(배경 없음)이라면 흰색 배경을 적용합니다.
-                        // 변경하기 전에 nav의 이전 inline 스타일을 저장하여 언마운트 시 복원합니다.
+                        // 네비게이션(nav)이 투명(배경 없음)이라면 반투명 흰색 배경을 적용
                         const nav = document.querySelector('nav') as HTMLElement | null;
                         if (nav) {
                             const inlineBg = (nav.style && nav.style.backgroundColor) ? nav.style.backgroundColor.trim() : '';
@@ -200,7 +209,8 @@ export default function Chat() {
                             const isTransparent = !inlineBg && (computedBg === 'transparent' || computedBg === 'rgba(0, 0, 0, 0)');
                             if (isTransparent) {
                                 if (prevNavBgRef.current === null) prevNavBgRef.current = nav.style.backgroundColor || '';
-                                nav.style.backgroundColor = '#ffffff';
+                                nav.style.backgroundColor = 'rgba(255, 255, 255, 0.95)';
+                                nav.style.backdropFilter = 'blur(10px)';
                                 navChangedRef.current = true;
                             }
                         }
@@ -234,6 +244,93 @@ export default function Chat() {
         if (e.key === 'Enter' && !e.shiftKey && !(e.nativeEvent as KeyboardEvent).isComposing) {
             e.preventDefault(); // 줄바꿈 방지
             void send(); // 비동기로 전송
+        }
+    };
+
+    // 다이어리에 저장 함수
+    const saveToDiary = async () => {
+        if (savingToDiary) return; // 이미 저장 중이면 무시
+        
+        // 로그인 상태 확인
+        if (!user) {
+            alert('로그인이 필요합니다. 다시 로그인해주세요.');
+            navigate('/login');
+            return;
+        }
+        
+        // 인사 메시지만 있는 경우 저장하지 않음
+        if (msgs.length <= 1) {
+            alert('저장할 대화 내용이 없습니다.');
+            return;
+        }
+        
+        const confirmSave = confirm('현재 대화를 다이어리에 저장하시겠습니까?');
+        if (!confirmSave) return;
+        
+        setSavingToDiary(true);
+        
+        try {
+            // 1. 오늘 날짜로 다이어리 세션 생성
+            const today = new Date();
+            const dateKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+            
+            console.log('📝 다이어리 세션 생성 시도:', dateKey);
+            
+            const createRes = await fetch('/api/diary/session', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({ date: dateKey })
+            });
+            
+            if (!createRes.ok) {
+                const errorData = await createRes.json().catch(() => ({}));
+                console.error('세션 생성 실패:', createRes.status, errorData);
+                throw new Error(errorData.message || `다이어리 세션 생성 실패 (${createRes.status})`);
+            }
+            
+            const createData = await createRes.json();
+            const sessionId = createData.id;
+            console.log('✅ 세션 생성 성공:', sessionId);
+            
+            // 2. 대화 내용을 다이어리 세션으로 가져오기 (첫 인사 메시지 제외)
+            const messagesToSave = msgs.slice(1).filter(m => m.content.trim() && m.content !== '…'); // 인사 메시지 및 빈 메시지 제외
+            
+            console.log('📤 저장할 메시지 개수:', messagesToSave.length);
+            
+            if (messagesToSave.length === 0) {
+                throw new Error('저장할 유효한 메시지가 없습니다.');
+            }
+            
+            const importRes = await fetch(`/api/diary/session/${sessionId}/import`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({ messages: messagesToSave })
+            });
+            
+            if (!importRes.ok) {
+                const errorData = await importRes.json().catch(() => ({}));
+                console.error('메시지 import 실패:', importRes.status, errorData);
+                throw new Error(errorData.message || `다이어리 저장 실패 (${importRes.status})`);
+            }
+            
+            const importData = await importRes.json();
+            console.log('✅ 저장 성공:', importData);
+            
+            // 3. 성공 알림 및 다이어리 페이지로 이동 여부 묻기
+            const goToDiary = confirm(`${importData.imported}개의 메시지가 다이어리에 저장되었습니다!\n\n다이어리 페이지로 이동하시겠습니까?`);
+            
+            if (goToDiary) {
+                navigate('/diary');
+            }
+            
+        } catch (error) {
+            console.error('❌ 다이어리 저장 에러:', error);
+            const errorMsg = error instanceof Error ? error.message : '다이어리 저장 중 오류가 발생했습니다.';
+            alert(errorMsg);
+        } finally {
+            setSavingToDiary(false);
         }
     };
 
@@ -276,12 +373,19 @@ export default function Chat() {
                         maxWidth: '70%',
                         whiteSpace: 'pre-wrap',
                         wordBreak: 'break-word',
-                        background: mine ? '#2563eb' : '#f1f5f9',
+                        background: mine 
+                            ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' 
+                            : 'rgba(255, 255, 255, 0.9)',
+                        backdropFilter: 'blur(10px)',
                         color: mine ? '#fff' : '#111',
-                        padding: '8px 12px',
-                        borderRadius: 12,
-                        borderTopRightRadius: mine ? 2 : 12,
-                        borderTopLeftRadius: mine ? 12 : 2,
+                        padding: '10px 14px',
+                        borderRadius: 16,
+                        borderTopRightRadius: mine ? 4 : 16,
+                        borderTopLeftRadius: mine ? 16 : 4,
+                        boxShadow: mine 
+                            ? '0 4px 12px rgba(102, 126, 234, 0.3)' 
+                            : '0 2px 8px rgba(0, 0, 0, 0.1)',
+                        border: mine ? 'none' : '1px solid rgba(0, 0, 0, 0.05)',
                     }}
                 >
                     {m.content}
@@ -313,18 +417,43 @@ export default function Chat() {
 
     return (
         <div style={{ maxWidth: 720, margin: '0 auto', padding: '24px 16px' }}>
-            <h2 style={{ textAlign: 'center', margin: '8px 0 16px' }}>AI 채팅 페이지</h2>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', margin: '8px 0 16px' }}>
+                <h2 style={{ textAlign: 'center', margin: 0, flex: 1 }}>AI 채팅 페이지</h2>
+                <button
+                    onClick={() => void saveToDiary()}
+                    disabled={savingToDiary || msgs.length <= 1}
+                    style={{
+                        padding: '8px 16px',
+                        borderRadius: 12,
+                        border: '1px solid rgba(16, 185, 129, 0.5)',
+                        background: savingToDiary ? 'rgba(209, 250, 229, 0.8)' : 'rgba(236, 253, 245, 0.9)',
+                        backdropFilter: 'blur(10px)',
+                        color: '#065f46',
+                        cursor: savingToDiary || msgs.length <= 1 ? 'not-allowed' : 'pointer',
+                        fontSize: 14,
+                        fontWeight: 600,
+                        opacity: msgs.length <= 1 ? 0.5 : 1,
+                        boxShadow: msgs.length > 1 ? '0 2px 8px rgba(16, 185, 129, 0.2)' : 'none',
+                        transition: 'all 0.3s ease'
+                    }}
+                    title={msgs.length <= 1 ? '저장할 대화가 없습니다' : '현재 대화를 다이어리에 저장'}
+                >
+                    {savingToDiary ? '저장 중...' : '📝 다이어리에 저장'}
+                </button>
+            </div>
 
             {/* 채팅 메시지 영역 */}
             <div
                 style={{
-                    border: '1px solid #e5e7eb',
-                    borderRadius: 12,
+                    border: '1px solid rgba(255, 255, 255, 0.3)',
+                    borderRadius: 16,
                     height: '60vh',
                     minHeight: 360,
                     padding: 12,
                     overflowY: 'auto',
-                    background: '#ffffff',
+                    background: 'rgba(255, 255, 255, 0.75)',
+                    backdropFilter: 'blur(20px)',
+                    boxShadow: '0 8px 32px rgba(0, 0, 0, 0.1)',
                 }}
             >
                 {/* 모든 메시지 렌더링 */}
@@ -352,11 +481,14 @@ export default function Chat() {
                         </div>
                         <div
                             style={{
-                                background: '#f1f5f9',
-                                color: '#111',
-                                padding: '8px 12px',
-                                borderRadius: 12,
-                                borderTopLeftRadius: 2,
+                                background: 'rgba(255, 255, 255, 0.9)',
+                                backdropFilter: 'blur(10px)',
+                                color: '#667eea',
+                                padding: '10px 14px',
+                                borderRadius: 16,
+                                borderTopLeftRadius: 4,
+                                boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
+                                border: '1px solid rgba(0, 0, 0, 0.05)',
                             }}
                         >
                             {/* 점 3개 애니메이션 */}
@@ -389,22 +521,31 @@ export default function Chat() {
                     rows={2}
                     style={{
                         flex: 1,
-                        padding: 10,
-                        border: '1px solid #e5e7eb',
-                        borderRadius: 8,
+                        padding: 12,
+                        border: '1px solid rgba(229, 231, 235, 0.5)',
+                        borderRadius: 12,
                         resize: 'vertical',
+                        background: 'rgba(255, 255, 255, 0.9)',
+                        backdropFilter: 'blur(10px)',
+                        boxShadow: '0 2px 8px rgba(0, 0, 0, 0.05)',
+                        outline: 'none',
+                        transition: 'all 0.3s ease',
                     }}
                 />
                 <button
                     type="submit"
                     disabled={sending || !input.trim()}
                     style={{
-                        padding: '10px 14px',
-                        borderRadius: 8,
-                        border: '1px solid #2563eb',
-                        background: sending ? '#93c5fd' : '#2563eb',
+                        padding: '10px 16px',
+                        borderRadius: 12,
+                        border: 'none',
+                        background: sending ? 'rgba(147, 197, 253, 0.8)' : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
                         color: '#fff',
                         cursor: sending ? 'not-allowed' : 'pointer',
+                        fontWeight: 600,
+                        boxShadow: sending ? 'none' : '0 4px 12px rgba(102, 126, 234, 0.4)',
+                        transition: 'all 0.3s ease',
+                        transform: sending ? 'scale(0.95)' : 'scale(1)',
                     }}
                 >
                     {sending ? '전송중…' : '전송'}

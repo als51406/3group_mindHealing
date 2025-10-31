@@ -884,6 +884,59 @@ app.delete('/api/diary/session/:id/messages/:mid', authMiddleware, async (req: a
   }
 });
 
+// POST /api/diary/session/:id/import { messages: [{ role, content }, ...] }
+// Chat.tsx에서 완료된 대화를 다이어리로 가져오기
+app.post('/api/diary/session/:id/import', authMiddleware, async (req: any, res) => {
+  try {
+    const id = String(req.params.id || '').trim();
+    const messages = req.body?.messages;
+    if (!ObjectId.isValid(id)) return res.status(400).json({ message: '유효하지 않은 세션 ID' });
+    if (!Array.isArray(messages) || messages.length === 0) return res.status(400).json({ message: 'messages 배열이 필요합니다.' });
+    
+    const client = await getClient();
+    const db = client.db(DB_NAME);
+    const userId = req.user.sub;
+    
+    // 세션 존재 확인
+    const session = await db.collection('diary_sessions').findOne({ _id: new ObjectId(id), userId });
+    if (!session) return res.status(404).json({ message: '세션을 찾을 수 없습니다.' });
+    
+    // 메시지들을 bulk insert
+    const docs = messages
+      .filter((m: any) => m.role && m.content && (m.role === 'user' || m.role === 'assistant'))
+      .map((m: any) => ({
+        sessionId: session._id,
+        userId,
+        role: m.role,
+        content: String(m.content),
+        createdAt: new Date()
+      }));
+    
+    if (docs.length === 0) return res.status(400).json({ message: '유효한 메시지가 없습니다.' });
+    
+    await db.collection('diary_session_messages').insertMany(docs);
+    
+    // 마지막 사용자 메시지로 감정 분석
+    const lastUserMsg = messages.filter((m: any) => m.role === 'user').slice(-1)[0];
+    if (lastUserMsg?.content) {
+      const mood = await detectEmotionFromText(lastUserMsg.content);
+      const personalizedColor = await personalizedColorForEmotion(db, userId, mood.color, mood.emotion);
+      const finalMood = { ...mood, color: personalizedColor };
+      await db.collection('diary_sessions').updateOne(
+        { _id: session._id },
+        { $set: { mood: finalMood, lastUpdatedAt: new Date() } }
+      );
+      return res.status(201).json({ ok: true, imported: docs.length, mood: finalMood });
+    }
+    
+    await db.collection('diary_sessions').updateOne({ _id: session._id }, { $set: { lastUpdatedAt: new Date() } });
+    res.status(201).json({ ok: true, imported: docs.length });
+  } catch (e: any) {
+    console.error('import error:', e?.message || e);
+    res.status(500).json({ message: '메시지 가져오기 오류' });
+  }
+});
+
 // POST /api/diary/session/:id/continue
 app.post('/api/diary/session/:id/continue', authMiddleware, async (req: any, res) => {
   try {

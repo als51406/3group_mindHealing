@@ -54,3 +54,48 @@ export function paletteFromBase(hex: string) {
   return { c1, c2, c3 };
 }
 
+// 생동감 있는 그라데이션을 위한 유사색 생성
+export function generateGradientColors(baseColor: string) {
+  const { h, s, l } = hexToHsl(baseColor);
+  
+  // 기본색
+  const color1 = baseColor;
+  
+  // 밝고 선명한 유사색 (색상 크게 회전)
+  const color2 = hslToHex(
+    (h + 45) % 360,  // 색상을 크게 회전
+    Math.min(100, s * 1.25),  // 채도 크게 증가
+    Math.min(85, l * 1.3)    // 밝기 크게 증가
+  );
+  
+  // 반대편 색상 (보색에 가깝게)
+  const color3 = hslToHex(
+    (h + 315) % 360,  // -45도 회전 (반대 방향)
+    Math.min(100, s * 1.15),
+    Math.max(25, l * 0.75)   // 더 어둡게
+  );
+  
+  // 중간 톤 (색상 차이 크게)
+  const color4 = hslToHex(
+    (h + 25) % 360,  // 중간 각도
+    Math.min(100, s * 1.2),
+    Math.min(80, l * 1.1)
+  );
+  
+  return { color1, color2, color3, color4 };
+}
+
+// 랜덤 그라데이션 각도 생성
+export function getRandomGradientAngle() {
+  const angles = [45, 90, 135, 180, 225, 270, 315];
+  return angles[Math.floor(Math.random() * angles.length)];
+}
+
+// 그라데이션 CSS 생성
+export function createGradientStyle(baseColor: string) {
+  const { color1, color2, color3, color4 } = generateGradientColors(baseColor);
+  const angle = getRandomGradientAngle();
+  
+  // 여러 색상을 사용한 복잡한 그라데이션
+  return `linear-gradient(${angle}deg, ${color1} 0%, ${color2} 30%, ${color4} 60%, ${color3} 100%)`;
+}
