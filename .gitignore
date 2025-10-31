@@ -3,6 +3,7 @@ node_modules/
 dist/
 .DS_Store
 *.tsbuildinfo
+
 # Logs
 logs
 *.log
@@ -18,6 +19,13 @@ dist-ssr
 *.local
 .env
 .env.example
+
+# Security - sensitive files
+cookies.txt
+*.cookie
+*.session
+*token*.txt
+*secret*.txt
 
 # Editor directories and files
 .vscode/*

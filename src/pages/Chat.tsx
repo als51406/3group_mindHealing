@@ -20,6 +20,10 @@ export default function Chat() {
     const [sending, setSending] = useState(false); // 메시지 전송 중 여부
     const [typing, setTyping] = useState(false); // AI가 "답변 생성 중" 상태 표시용
     const bottomRef = useRef<HTMLDivElement | null>(null); // 스크롤 맨 아래로 이동시키기 위한 참조
+    // 이전에 변경한 바디/네비(nav) 배경을 저장해서 컴포넌트 언마운트 시 복원하기 위한 레퍼런스
+    const prevBodyBgRef = useRef<string | null>(null);
+    const prevNavBgRef = useRef<string | null>(null);
+    const navChangedRef = useRef(false);
 
     // 채팅 기록 불러오기 (컴포넌트 처음 렌더링 시 1회 실행)
     useEffect(() => {
@@ -32,10 +36,10 @@ export default function Chat() {
 
                 // 서버에서 받은 데이터가 배열이면 기존 인사 메시지 밑에 병합
                 if (Array.isArray(data?.items) && data.items.length > 0) {
-                    const history: AiMsg[] = data.items.map((x: any) => ({
-                        role: x.role,
-                        content: removeJsonFromContent(x.content),
-                    }));
+                    const history: AiMsg[] = data.items.map((x: unknown) => {
+                        const item = x as { role?: string; content?: string };
+                        return { role: (item.role === 'user' ? 'user' : 'assistant'), content: removeJsonFromContent(String(item.content || '')) };
+                    });
                     // 첫 메시지(인사)는 유지하고, 그 아래에 대화 기록 추가
                     setMsgs((prev) => [prev[0], ...history]);
                 }
@@ -44,6 +48,29 @@ export default function Chat() {
             }
         })();
     }, []); // 마운트 시 한 번만 실행
+
+    // 컴포넌트 언마운트 시(또는 재렌더에 의해 cleanup이 필요할 때) 바디와 네비게이션 배경을 복원
+    useEffect(() => {
+        return () => {
+            try {
+                if (prevBodyBgRef.current !== null) {
+                    document.body.style.backgroundColor = prevBodyBgRef.current || '';
+                    prevBodyBgRef.current = null;
+                }
+                if (navChangedRef.current) {
+                    const nav = document.querySelector('nav') as HTMLElement | null;
+                    if (nav) {
+                        // 복원할 이전 inline 스타일이 있다면 복원, 없으면 빈 문자열로 초기화
+                        nav.style.backgroundColor = prevNavBgRef.current || '';
+                    }
+                    prevNavBgRef.current = null;
+                    navChangedRef.current = false;
+                }
+            } catch {
+                // DOM 관련 문제 발생 시 무시
+            }
+        };
+    }, []);
 
     // 문자열에서 { ... } 형태의 JSON 제거
     const removeJsonFromContent = (content: string) => {
@@ -92,20 +119,10 @@ export default function Chat() {
 
             // 서버 응답이 실패한 경우
             if (!res.ok) {
-                // 마지막 "…" 메시지를 제거하고 에러 메시지 표시
-                setMsgs((prev) => [
-                    ...prev.slice(0, -1),
-                    { role: 'assistant', content: '답변 생성에 실패했습니다. 잠시 후 다시 시도해 주세요.' },
-                ]);
-                return;
-            }
-
-            // 추가적으로 상태 코드에 따라 에러 처리 분기
-            if (!res.ok) {
                 if (res.status === 401) {
                     // 로그인 필요
                     setMsgs((prev) => [
-                        ...prev,
+                        ...prev.slice(0, -1),
                         { role: 'assistant', content: '로그인이 필요합니다. 로그인 후 다시 시도해 주세요.' },
                     ]);
                 } else {
@@ -113,13 +130,13 @@ export default function Chat() {
                     try {
                         const err = await res.json();
                         setMsgs((prev) => [
-                            ...prev,
+                            ...prev.slice(0, -1),
                             { role: 'assistant', content: err?.message || '답변 생성에 실패했습니다.' },
                         ]);
                     } catch {
                         // 예외 처리
                         setMsgs((prev) => [
-                            ...prev,
+                            ...prev.slice(0, -1),
                             { role: 'assistant', content: '답변 생성에 실패했습니다. 잠시 후 다시 시도해 주세요.' },
                         ]);
                     }
@@ -130,8 +147,6 @@ export default function Chat() {
             // 성공적으로 응답 받았을 때
             const data = await res.json();
             let content = data?.content || '';
-
-            console.log(content);
 
             // ----------------------------------------- # AI 메시지에 포함된 json 추출 및 사용 -시작- -----------------------------------------
             // jsonMatch: AI 메시지에 포함된 json들
@@ -145,9 +160,31 @@ export default function Chat() {
 
                 // json에 color 속성이 있을 때
                 if (json.color) {
+                    try {
+                        // 바디 배경을 변경하기 전에 이전 값을 저장
+                        if (prevBodyBgRef.current === null) {
+                            prevBodyBgRef.current = document.body.style.backgroundColor || '';
+                        }
+                        // Chat 페이지 전용 표시자 설정 (다른 페이지에서 흰색 강제화에 사용)
+                        try { document.body.dataset.chatBg = '1'; } catch {}
+                        document.body.style.backgroundColor = json.color;
 
-                    // 배경색을 json의 color 깂으로 변경
-                    document.body.style.backgroundColor = json.color;
+                        // 네비게이션(nav)이 투명(배경 없음)이라면 흰색 배경을 적용합니다.
+                        // 변경하기 전에 nav의 이전 inline 스타일을 저장하여 언마운트 시 복원합니다.
+                        const nav = document.querySelector('nav') as HTMLElement | null;
+                        if (nav) {
+                            const inlineBg = (nav.style && nav.style.backgroundColor) ? nav.style.backgroundColor.trim() : '';
+                            const computedBg = getComputedStyle(nav).backgroundColor || '';
+                            const isTransparent = !inlineBg && (computedBg === 'transparent' || computedBg === 'rgba(0, 0, 0, 0)');
+                            if (isTransparent) {
+                                if (prevNavBgRef.current === null) prevNavBgRef.current = nav.style.backgroundColor || '';
+                                nav.style.backgroundColor = '#ffffff';
+                                navChangedRef.current = true;
+                            }
+                        }
+                    } catch {
+                        // DOM 관련 문제 발생시 무시
+                    }
                 }
 
                 // AI 메시지에서 json을 제거하기 + 제거하고 남은 빈 칸 제거
@@ -172,7 +209,7 @@ export default function Chat() {
     // 엔터 키로 전송, Shift+Enter로 줄바꿈
     const onKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
         // IME(한글 입력 중 등) 상태가 아닐 때만 엔터로 전송
-        if (e.key === 'Enter' && !e.shiftKey && !(e as any).nativeEvent?.isComposing) {
+        if (e.key === 'Enter' && !e.shiftKey && !(e.nativeEvent as KeyboardEvent).isComposing) {
             e.preventDefault(); // 줄바꿈 방지
             void send(); // 비동기로 전송
         }

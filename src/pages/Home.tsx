@@ -12,7 +12,7 @@ export default function Home() {
     // (단순화) 첫 입력 → /chat 라우팅으로 변경됨
 
     // firstChat: 처음으로 input에서 Enter를 눌렀을 때
-    const firstChat = (event: any) => {
+    const firstChat = (event: React.FormEvent<HTMLFormElement>) => {
         // 새로고침 방지
         event.preventDefault();
         // 첫 입력 후 즉시 /chat 으로 이동

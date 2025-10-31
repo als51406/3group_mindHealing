@@ -42,8 +42,9 @@ export default function Login() {
             // 성공 시 네비게이션 상태 갱신 후 홈으로 이동
             window.dispatchEvent(new Event('auth:changed'));
             navigate("/");
-        } catch (err: any) {
-            setError(err.message || "네트워크 오류가 발생했습니다.");
+        } catch (err) {
+            const errorMessage = err instanceof Error ? err.message : "네트워크 오류가 발생했습니다.";
+            setError(errorMessage);
         } finally {
             setLoading(false);
         }

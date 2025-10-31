@@ -40,8 +40,9 @@ export default function Register() {
                 throw new Error(msg);
             }
             navigate("/login");
-        } catch (err: any) {
-            setError(err.message || "네트워크 오류가 발생했습니다.");
+        } catch (err) {
+            const errorMessage = err instanceof Error ? err.message : "네트워크 오류가 발생했습니다.";
+            setError(errorMessage);
         } finally {
             setLoading(false);
         }

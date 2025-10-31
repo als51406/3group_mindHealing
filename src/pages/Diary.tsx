@@ -4,17 +4,10 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import AuroraOrb from '../components/AuroraOrb';
 import AuroraAuto from '../components/AuroraAuto';
+import type { DiarySessionResponse, DiaryMessageResponse, DiarySessionsApiResponse, DiarySessionDetailApiResponse } from '../types/api';
 
-type DiaryListItem = {
-    _id: string;
-    date: string; // YYYY-MM-DD
-    title?: string;
-    mood?: { emotion: string; score: number; color: string } | null;
-    lastUpdatedAt: string;
-    preview?: string;
-};
-
-type DiaryMessage = { id?: string; role: 'user' | 'assistant'; content: string; createdAt?: string };
+type DiaryListItem = DiarySessionResponse;
+type DiaryMessage = DiaryMessageResponse;
 
 function todayKey() {
     const d = new Date();
@@ -60,9 +53,9 @@ export default function Diary() {
           // 세션 목록 조회
           const res = await fetch('/api/diary/sessions', { credentials: 'include' });
             if (!res.ok) return;
-            const data = await res.json();
+            const data: DiarySessionsApiResponse = await res.json();
             if (Array.isArray(data?.items)) {
-                setList(data.items.map((d: any) => ({ ...d, _id: String(d._id) })));
+                setList(data.items.map((d) => ({ ...d, _id: String(d._id) })));
             }
         } catch {}
     };
@@ -72,9 +65,9 @@ export default function Diary() {
             setLoadingDiary(true);
           const res = await fetch(`/api/diary/session/${sessionId}`, { credentials: 'include' });
             if (!res.ok) return;
-                    const data = await res.json();
+                    const data: DiarySessionDetailApiResponse = await res.json();
             const msgs: DiaryMessage[] = Array.isArray(data?.messages)
-                        ? data.messages.map((m: any) => ({ id: m.id, role: m.role, content: m.content, createdAt: m.createdAt }))
+                        ? data.messages.map((m) => ({ id: m.id, role: m.role, content: m.content, createdAt: m.createdAt }))
                 : [];
             setMessages(msgs);
           setMood(data?.session?.mood ?? null);
@@ -91,9 +84,9 @@ export default function Diary() {
                 try {
                     const res = await fetch('/api/diary/sessions', { credentials: 'include' });
                     if (!res.ok) return;
-                    const data = await res.json();
-                    const items: any[] = Array.isArray(data?.items) ? data.items : [];
-                    setList(items.map((d: any) => ({ ...d, _id: String(d._id) })));
+                    const data: DiarySessionsApiResponse = await res.json();
+                    const items: DiarySessionResponse[] = Array.isArray(data?.items) ? data.items : [];
+                    setList(items.map((d) => ({ ...d, _id: String(d._id) })));
                     if (items.length === 0) {
                         // 첫 세션 자동 생성
                         await createToday();
@@ -146,7 +139,7 @@ export default function Diary() {
     };
 
     const onKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-        if (e.key === 'Enter' && !e.shiftKey && !(e as any).nativeEvent?.isComposing) {
+        if (e.key === 'Enter' && !e.shiftKey && !(e.nativeEvent as KeyboardEvent).isComposing) {
             e.preventDefault();
             void send();
         }
