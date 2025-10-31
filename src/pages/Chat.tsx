@@ -32,10 +32,10 @@ export default function Chat() {
 
                 // 서버에서 받은 데이터가 배열이면 기존 인사 메시지 밑에 병합
                 if (Array.isArray(data?.items) && data.items.length > 0) {
-                    const history: AiMsg[] = data.items.map((x: any) => ({
-                        role: x.role,
-                        content: removeJsonFromContent(x.content),
-                    }));
+                    const history: AiMsg[] = data.items.map((x: unknown) => {
+                        const item = x as { role?: string; content?: string };
+                        return { role: (item.role === 'user' ? 'user' : 'assistant'), content: removeJsonFromContent(String(item.content || '')) };
+                    });
                     // 첫 메시지(인사)는 유지하고, 그 아래에 대화 기록 추가
                     setMsgs((prev) => [prev[0], ...history]);
                 }
@@ -172,7 +172,7 @@ export default function Chat() {
     // 엔터 키로 전송, Shift+Enter로 줄바꿈
     const onKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
         // IME(한글 입력 중 등) 상태가 아닐 때만 엔터로 전송
-        if (e.key === 'Enter' && !e.shiftKey && !(e as any).nativeEvent?.isComposing) {
+    if (e.key === 'Enter' && !e.shiftKey && !(e as unknown as { nativeEvent?: { isComposing?: boolean } }).nativeEvent?.isComposing) {
             e.preventDefault(); // 줄바꿈 방지
             void send(); // 비동기로 전송
         }

@@ -30,7 +30,7 @@ export default function Online() {
           const data = await res.json();
           if (Array.isArray(data?.items)) setMessages(data.items);
         }
-      } catch {}
+      } catch (err: unknown) { console.warn('fetchMessages failed', err); }
     };
     const fetchLoop = async () => {
       await fetchMessages();
@@ -62,14 +62,14 @@ export default function Online() {
       if (res.ok) {
         setInput('');
         // 전송 직후 한 번 재조회하여 즉시 반영
-        try { await fetch('/api/online/messages', { credentials: 'include' }).then(r => r.ok ? r.json() : null).then(d => { if (d?.items) setMessages(d.items); }); } catch {}
+  try { await fetch('/api/online/messages', { credentials: 'include' }).then(r => r.ok ? r.json() : null).then(d => { if (d?.items) setMessages(d.items); }); } catch (err: unknown) { console.warn('post-send refresh failed', err); }
       }
-    } catch {}
+  } catch (err: unknown) { console.warn('send failed', err); }
     finally { setSending(false); }
   };
 
   const onKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === 'Enter' && !e.shiftKey && !(e as any).nativeEvent?.isComposing) {
+  if (e.key === 'Enter' && !e.shiftKey && !(e as unknown as { nativeEvent?: { isComposing?: boolean } }).nativeEvent?.isComposing) {
       e.preventDefault();
       void send();
     }

@@ -16,7 +16,8 @@ function hexToHsl(hex: string) {
   const g = parseInt(c.slice(2, 4), 16) / 255;
   const b = parseInt(c.slice(4, 6), 16) / 255;
   const max = Math.max(r, g, b), min = Math.min(r, g, b);
-  let h = 0, s = 0, l = (max + min) / 2;
+  let h = 0, s = 0;
+  const l = (max + min) / 2;
   if (max !== min) {
     const d = max - min;
     s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
@@ -203,7 +204,7 @@ export default function AuroraThree({
   const sceneRef = useRef<THREE.Scene | null>(null);
   const cameraRef = useRef<THREE.Camera | null>(null);
   const meshRef = useRef<THREE.Mesh | null>(null);
-  const uniformsRef = useRef<any>(null);
+  const uniformsRef = useRef<Record<string, unknown> | null>(null);
   const rafRef = useRef<number | null>(null);
 
   const colors = useMemo(() => {
@@ -222,8 +223,13 @@ export default function AuroraThree({
     // Renderer
   const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, premultipliedAlpha: true, powerPreference: 'low-power' });
   renderer.setClearColor(0x000000, 0);
-    // treat input HEX colors as sRGB and convert to linear for correct shading
-    (renderer as any).outputEncoding = (THREE as any).sRGBEncoding;
+  // treat input HEX colors as sRGB and convert to linear for correct shading
+  // `outputEncoding` and THREE enums may be missing from some type defs; access via bracket to avoid casting to any.
+  // Some Three.js type defs may omit sRGBEncoding in this environment; use bracket access safely.
+  const sRGB = (THREE as unknown as Record<string, unknown>).sRGBEncoding;
+  if (sRGB !== undefined) {
+    (renderer as unknown as Record<string, unknown>)['outputEncoding'] = sRGB;
+  }
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   rendererRef.current = renderer;
 
@@ -343,7 +349,7 @@ export default function AuroraThree({
     container.appendChild(renderer.domElement);
     renderer.domElement.style.width = '100%';
     renderer.domElement.style.height = '100%';
-    (renderer.domElement.style as any).display = 'block';
+  (renderer.domElement.style as CSSStyleDeclaration).display = 'block';
 
   const setSize = (w: number, h: number) => {
       renderer.setSize(w, h, false);
@@ -358,7 +364,7 @@ export default function AuroraThree({
       container.appendChild(renderer.domElement);
     }
 
-    let start = performance.now();
+    const start = performance.now();
     const loop = () => {
       rafRef.current = requestAnimationFrame(loop);
       const now = performance.now();
@@ -433,19 +439,23 @@ export default function AuroraThree({
 
   // Update colors when prop changes
   useEffect(() => {
-    const uniforms = uniformsRef.current;
+    const uniforms = uniformsRef.current as unknown as {
+      u_c1: { value: THREE.Color };
+      u_c2: { value: THREE.Color };
+      u_c3: { value: THREE.Color };
+    } | null;
     if (!uniforms) return;
     const { c1, c2, c3 } = colors;
-  // convert incoming sRGB colors to linear for shader
-  uniforms.u_c1.value.set(c1.r, c1.g, c1.b).convertSRGBToLinear();
-  uniforms.u_c2.value.set(c2.r, c2.g, c2.b).convertSRGBToLinear();
-  uniforms.u_c3.value.set(c3.r, c3.g, c3.b).convertSRGBToLinear();
+    // convert incoming sRGB colors to linear for shader
+    uniforms.u_c1.value.set(c1.r, c1.g, c1.b).convertSRGBToLinear();
+    uniforms.u_c2.value.set(c2.r, c2.g, c2.b).convertSRGBToLinear();
+    uniforms.u_c3.value.set(c3.r, c3.g, c3.b).convertSRGBToLinear();
   }, [colors]);
 
   // Update size when prop changes
   useEffect(() => {
     const renderer = rendererRef.current;
-    const uniforms = uniformsRef.current;
+    const uniforms = uniformsRef.current as unknown as { u_resolution: { value: THREE.Vector2 } } | null;
     if (!renderer || !uniforms) return;
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
     renderer.setSize(size, size, false);

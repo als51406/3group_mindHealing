@@ -1,6 +1,6 @@
 // Diary.tsx — 날짜별 다이어리 + AI 대화 저장/조회
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+// useNavigate removed — redirect handled in auth hook effect
 import { useAuth } from '../hooks/useAuth';
 import AuroraOrb from '../components/AuroraOrb';
 import AuroraAuto from '../components/AuroraAuto';
@@ -25,7 +25,7 @@ function todayKey() {
 }
 
 export default function Diary() {
-    const navigate = useNavigate();
+    // navigate removed to satisfy lint (redirect handled by auth state effect)
     const { user, loading } = useAuth();
 
         const [list, setList] = useState<DiaryListItem[]>([]); // 세션 목록
@@ -43,8 +43,8 @@ export default function Diary() {
 
     useEffect(() => {
         if (loading) return;
-        if (!user) navigate('/login');
-    }, [loading, user, navigate]);
+        if (!user) return;
+    }, [loading, user]);
 
     const bgStyle = useMemo(() => {
         const c = mood?.color || '#f4f4f5';
@@ -58,13 +58,34 @@ export default function Diary() {
       const refreshList = async () => {
         try {
           // 세션 목록 조회
-          const res = await fetch('/api/diary/sessions', { credentials: 'include' });
-            if (!res.ok) return;
-            const data = await res.json();
-            if (Array.isArray(data?.items)) {
-                setList(data.items.map((d: any) => ({ ...d, _id: String(d._id) })));
+            const res = await fetch('/api/diary/sessions', { credentials: 'include' });
+                    if (!res.ok) return;
+                    const data = await res.json();
+                    if (Array.isArray(data?.items)) {
+                const items = data.items as Array<Record<string, unknown>>;
+                setList(items.map((d) => {
+                    const rec = d as Record<string, unknown>;
+                    return ({
+                        _id: String(rec._id ?? ''),
+                        date: String(rec.date ?? ''),
+                        title: rec.title ? String(rec.title) : undefined,
+                        mood: (rec.mood as { emotion?: unknown; score?: unknown; color?: unknown } | undefined) ? (() => {
+                            const m = rec.mood as { emotion?: unknown; score?: unknown; color?: unknown };
+                            return {
+                                emotion: String(m?.emotion ?? ''),
+                                score: Number(m?.score ?? 0),
+                                color: String(m?.color ?? ''),
+                            };
+                        })() : null,
+                        lastUpdatedAt: String(rec.lastUpdatedAt ?? ''),
+                        preview: rec.preview ? String(rec.preview) : undefined,
+                    } as DiaryListItem);
+                }));
             }
-        } catch {}
+        } catch (err) {
+            // 로그를 남기고 무시: UI는 실패 시 조용히 복구하도록 설계
+            console.warn('refreshList failed', err);
+        }
     };
 
       const loadSession = async (sessionId: string) => {
@@ -73,15 +94,23 @@ export default function Diary() {
           const res = await fetch(`/api/diary/session/${sessionId}`, { credentials: 'include' });
             if (!res.ok) return;
                     const data = await res.json();
-            const msgs: DiaryMessage[] = Array.isArray(data?.messages)
-                        ? data.messages.map((m: any) => ({ id: m.id, role: m.role, content: m.content, createdAt: m.createdAt }))
+                const msgs: DiaryMessage[] = Array.isArray(data?.messages)
+                    ? (data.messages as Array<Record<string, unknown>>).map((m) => {
+                        const rec = m as Record<string, unknown>;
+                        const id = rec.id ? String(rec.id) : undefined;
+                        const role = rec.role === 'user' ? 'user' : 'assistant';
+                        const content = rec.content ? String(rec.content) : '';
+                        const createdAt = rec.createdAt ? String(rec.createdAt) : undefined;
+                        return { id, role, content, createdAt } as DiaryMessage;
+                    })
                 : [];
             setMessages(msgs);
           setMood(data?.session?.mood ?? null);
           setSelectedDate(String(data?.session?.date || todayKey()));
             await refreshList();
-        } catch {}
-        finally { setLoadingDiary(false); }
+        } catch (err) {
+            console.warn('loadSession failed', err);
+        } finally { setLoadingDiary(false); }
     };
 
         // 첫 진입 시 세션이 없으면 자동 생성/선택, 있으면 최신 세션 자동 선택
@@ -92,18 +121,35 @@ export default function Diary() {
                     const res = await fetch('/api/diary/sessions', { credentials: 'include' });
                     if (!res.ok) return;
                     const data = await res.json();
-                    const items: any[] = Array.isArray(data?.items) ? data.items : [];
-                    setList(items.map((d: any) => ({ ...d, _id: String(d._id) })));
-                    if (items.length === 0) {
+                    const items: Array<Record<string, unknown>> = Array.isArray(data?.items) ? data.items : [];
+                    setList(items.map((d) => {
+                        const rec = d as Record<string, unknown>;
+                        return ({
+                            _id: String(rec._id ?? ''),
+                            date: String(rec.date ?? ''),
+                            title: rec.title ? String(rec.title) : undefined,
+                            mood: (rec.mood as { emotion?: unknown; score?: unknown; color?: unknown } | undefined) ? (() => {
+                                const m = rec.mood as { emotion?: unknown; score?: unknown; color?: unknown };
+                                return {
+                                    emotion: String(m?.emotion ?? ''),
+                                    score: Number(m?.score ?? 0),
+                                    color: String(m?.color ?? ''),
+                                };
+                            })() : null,
+                            lastUpdatedAt: String(rec.lastUpdatedAt ?? ''),
+                            preview: rec.preview ? String(rec.preview) : undefined,
+                        } as DiaryListItem);
+                    }));
+                            if (items.length === 0) {
                         // 첫 세션 자동 생성
                         await createToday();
                     } else {
-                        const id = String(items[0]._id);
+                        const id = String((items[0] as Record<string, unknown>)._id ?? '');
                         setSelected(id);
                         await loadSession(id);
                     }
-                } catch {
-                    // ignore
+                } catch (err) {
+                    console.warn('initial diary load failed', err);
                 }
             })();
             // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -138,7 +184,8 @@ export default function Diary() {
             setMood(data?.mood ?? null);
             setShowFeedback(false);
             await refreshList();
-        } catch {
+        } catch (err) {
+            console.warn('send diary chat failed', err);
             setMessages((prev) => [...prev.slice(0, -1), { role: 'assistant', content: '네트워크 오류가 발생했습니다.' }]);
         } finally {
             setSending(false);
@@ -146,7 +193,7 @@ export default function Diary() {
     };
 
     const onKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-        if (e.key === 'Enter' && !e.shiftKey && !(e as any).nativeEvent?.isComposing) {
+    if (e.key === 'Enter' && !e.shiftKey && !(e as unknown as { nativeEvent?: { isComposing?: boolean } }).nativeEvent?.isComposing) {
             e.preventDefault();
             void send();
         }
@@ -176,10 +223,12 @@ export default function Diary() {
                 }
             } else {
                 let msg = '삭제에 실패했습니다.';
-                try { const j = await res.json(); if (j?.message) msg = j.message; } catch {}
+                try { const j = await res.json(); if (j?.message) msg = j.message; } catch (e) { console.warn('parse delete error', e); }
                 alert(msg);
             }
-        } catch {}
+        } catch (err) {
+            console.warn('deleteSession failed', err);
+        }
     };
 
         const createToday = async () => {
@@ -190,7 +239,7 @@ export default function Diary() {
                 const id = String(data?.id);
                 setSelected(id);
                 await loadSession(id);
-            } catch {}
+            } catch (err) { console.warn('createToday failed', err); }
         };
 
                 // 제목 저장 기능 제거
@@ -287,18 +336,18 @@ export default function Diary() {
                     {mood && (
                         <div style={{ position: 'absolute', top: 56, right: 12, zIndex: 2, background: 'rgba(255,255,255,0.9)', border: '1px solid #e5e7eb', borderRadius: 10, padding: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
                             <span style={{ fontSize: 12, color: '#374151' }}>이 색이 지금 감정에 어울리나요?</span>
-                            <button
+                                <button
                                 onClick={async () => {
                                     try {
                                         await fetch('/api/feedback/color', { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify({ emotion: mood?.emotion, colorHex: mood?.color, accepted: true }) });
                                         setShowFeedback(false);
-                                    } catch {}
+                                    } catch (err) { console.warn('feedback accept failed', err); }
                                 }}
                                 style={{ fontSize: 12, padding: '4px 8px', borderRadius: 6, border: '1px solid #10b981', background: '#ecfdf5', color: '#065f46', cursor: 'pointer' }}
                             >네</button>
                             <button onClick={() => { setShowFeedback(v => !v); setCorrectedColor(mood?.color || '#999999'); }} style={{ fontSize: 12, padding: '4px 8px', borderRadius: 6, border: '1px solid #f59e0b', background: '#fffbeb', color: '#92400e', cursor: 'pointer' }}>아니요</button>
                             {showFeedback && (
-                                <form onSubmit={async (e) => { e.preventDefault(); try { await fetch('/api/feedback/color', { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify({ emotion: mood?.emotion, colorHex: mood?.color, accepted: false, correctedColorHex: correctedColor }) }); setShowFeedback(false); setMood((prev)=> prev ? { ...prev, color: correctedColor } : prev); } catch {} }} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                <form onSubmit={async (e) => { e.preventDefault(); try { await fetch('/api/feedback/color', { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify({ emotion: mood?.emotion, colorHex: mood?.color, accepted: false, correctedColorHex: correctedColor }) }); setShowFeedback(false); setMood((prev)=> prev ? { ...prev, color: correctedColor } : prev); } catch (err) { console.warn('feedback submit failed', err); } }} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                                     <input type="color" aria-label="색 수정" value={correctedColor || '#999999'} onChange={(e) => setCorrectedColor(e.target.value)} style={{ width: 28, height: 22, padding: 0, border: '1px solid #e5e7eb', borderRadius: 4 }} />
                                     <button type="submit" style={{ fontSize: 12, padding: '4px 8px', borderRadius: 6, border: '1px solid #2563eb', background: '#eff6ff', color: '#1e3a8a', cursor: 'pointer' }}>저장</button>
                                 </form>

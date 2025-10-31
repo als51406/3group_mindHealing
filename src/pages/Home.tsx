@@ -2,21 +2,22 @@
 // 토닥톡 홈페이지에 접속했을 때 첫 화면입니다.
 // AI와 대화할 수 있습니다.
 
-import { useNavigate } from "react-router-dom";
+import { useState } from 'react';
+import type { FormEvent } from 'react';
+import Chat from './Chat';
 
 export default function Home() {
 
-    // navigate: 페이지를 이동할 때 사용
-    const navigate = useNavigate();
+    const [showChatModal, setShowChatModal] = useState(false);
 
     // (단순화) 첫 입력 → /chat 라우팅으로 변경됨
 
     // firstChat: 처음으로 input에서 Enter를 눌렀을 때
-    const firstChat = (event: any) => {
+    const firstChat = (event: FormEvent<HTMLFormElement>) => {
         // 새로고침 방지
         event.preventDefault();
-        // 첫 입력 후 즉시 /chat 으로 이동
-        navigate('/chat');
+        // 모달로 Chat 열기
+        setShowChatModal(true);
     }
 
     // (미사용) 이전 단계 핸들러 제거
@@ -45,6 +46,20 @@ export default function Home() {
                         }}
                     />
                 </form>
+                {/* Chat modal */}
+                {showChatModal && (
+                    <div style={{ position: 'fixed', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 60 }}>
+                        <div onClick={() => setShowChatModal(false)} style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.4)' }} />
+                        <div style={{ position: 'relative', width: 'min(920px, 96%)', maxHeight: '92vh', background: '#fff', borderRadius: 12, boxShadow: '0 20px 40px rgba(2,6,23,0.25)', overflow: 'auto' }}>
+                            <div style={{ display: 'flex', justifyContent: 'flex-end', padding: 8 }}>
+                                <button onClick={() => setShowChatModal(false)} style={{ border: 'none', background: 'transparent', fontSize: 18, cursor: 'pointer' }}>✕</button>
+                            </div>
+                            <div style={{ padding: 8 }}>
+                                <Chat />
+                            </div>
+                        </div>
+                    </div>
+                )}
             </div>
         </div>
         </>

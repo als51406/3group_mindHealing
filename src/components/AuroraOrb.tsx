@@ -8,7 +8,8 @@ function hexToHsl(hex: string) {
   const g = parseInt(c.slice(2, 4), 16) / 255;
   const b = parseInt(c.slice(4, 6), 16) / 255;
   const max = Math.max(r, g, b), min = Math.min(r, g, b);
-  let h = 0, s = 0, l = (max + min) / 2;
+  let h = 0, s = 0;
+  const l = (max + min) / 2;
   if (max !== min) {
     const d = max - min;
     s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
@@ -53,17 +54,17 @@ export default function AuroraOrb({ color, size = 260, className = '' }: { color
   const [showNew, setShowNew] = useState(false);
   const current = useMemo(() => paletteFromBase(prev), [prev]);
   const next = useMemo(() => paletteFromBase(color), [color]);
-  const style: React.CSSProperties = {
-    ['--size' as any]: `${size}px`,
-    ['--c1' as any]: current.c1,
-    ['--c2' as any]: current.c2,
-    ['--c3' as any]: current.c3,
-  };
-  const styleOverlay: React.CSSProperties = {
-    ['--c1' as any]: next.c1,
-    ['--c2' as any]: next.c2,
-    ['--c3' as any]: next.c3,
-  };
+  const style = {
+    ['--size']: `${size}px`,
+    ['--c1']: current.c1,
+    ['--c2']: current.c2,
+    ['--c3']: current.c3,
+  } as React.CSSProperties & Record<string, string>;
+  const styleOverlay = {
+    ['--c1']: next.c1,
+    ['--c2']: next.c2,
+    ['--c3']: next.c3,
+  } as React.CSSProperties & Record<string, string>;
 
   useEffect(() => {
     if (color === prev) return;
