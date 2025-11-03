@@ -91,46 +91,6 @@ export default function Diary() {
         } as React.CSSProperties;
     }, [mood]);
 
-    // 날짜별로 AI 세션 그룹화
-    const groupedByDate = useMemo(() => {
-        const grouped = new Map<string, DiaryListItem[]>();
-        list.forEach((item) => {
-            const date = item.date;
-            if (!grouped.has(date)) {
-                grouped.set(date, []);
-            }
-            grouped.get(date)!.push(item);
-        });
-        // 날짜 내림차순 정렬 (최신 날짜가 위로)
-        return Array.from(grouped.entries()).sort((a, b) => b[0].localeCompare(a[0]));
-    }, [list]);
-
-    // 날짜별로 온라인 세션 그룹화
-    const groupedOnlineByDate = useMemo(() => {
-        const grouped = new Map<string, DiaryListItem[]>();
-        onlineList.forEach((item) => {
-            const date = item.date;
-            if (!grouped.has(date)) {
-                grouped.set(date, []);
-            }
-            grouped.get(date)!.push(item);
-        });
-        // 날짜 내림차순 정렬 (최신 날짜가 위로)
-        return Array.from(grouped.entries()).sort((a, b) => b[0].localeCompare(a[0]));
-    }, [onlineList]);
-
-    // AI 세션 날짜 필터링
-    const filteredAIGroupedByDate = useMemo(() => {
-        if (!filterDate) return groupedByDate;
-        return groupedByDate.filter(([date]) => date === filterDate);
-    }, [groupedByDate, filterDate]);
-
-    // 온라인 세션 날짜 필터링
-    const filteredOnlineGroupedByDate = useMemo(() => {
-        if (!filterDate) return groupedOnlineByDate;
-        return groupedOnlineByDate.filter(([date]) => date === filterDate);
-    }, [groupedOnlineByDate, filterDate]);
-
     // 검색어로 AI 세션 필터링
     const searchFilteredAISessions = useMemo(() => {
         if (!searchQuery.trim()) return list;
@@ -822,7 +782,7 @@ export default function Diary() {
                                 {searchQuery || filterDate ? '검색 결과가 없습니다' : '온라인 채팅 후 저장해보세요! 🎯'}
                             </div>
                         ) : (
-                            finalFilteredOnlineGroupedByDate.flatMap(([date, items]) => 
+                            finalFilteredOnlineGroupedByDate.flatMap(([, items]) => 
                                 items.map((item) => {
                                     const active = item._id === selected;
                                     const displayTitle = item.title || `온라인 채팅 ${new Date(item.lastUpdatedAt).toLocaleString('ko-KR')}`;
