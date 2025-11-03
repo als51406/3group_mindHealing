@@ -13,7 +13,7 @@ if (fs.existsSync(envPath)) {
 import express from 'express';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
-import { MongoClient, ObjectId, Db } from 'mongodb';
+import { MongoClient, ObjectId } from 'mongodb';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import OpenAI from 'openai';
@@ -28,16 +28,11 @@ const OPENAI_API_KEY = process.env.OPENAI_API_KEY || '';
 // 기본 모델: 최신 가용성이 높은 소형 모델로 설정 (필요시 .env로 재정의)
 const OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-4.1-nano';
 
-// typed request for authenticated routes (adds `user` payload used throughout handlers)
-type AuthedRequest = express.Request & { user?: { sub: string; email?: string } };
-// DBItem removed (not needed) to satisfy linter
-
 async function chatCompletionWithFallback(openai: OpenAI, messages: Array<{ role: string; content: string }>, primaryModel?: string) {
   const preferred = primaryModel || OPENAI_MODEL;
   try {
-      const createChat = (openai as unknown as { chat: { completions: { create: (...args: unknown[]) => Promise<unknown> } } }).chat.completions.create;
-      return await (createChat as (...args: unknown[]) => Promise<any>)({ model: preferred, messages: [
-        ...messages.map((m: { role: string; content: unknown }) => ({ role: m.role, content: String(m.content) })),
+  return await openai.chat.completions.create({ model: preferred, messages: [
+        ...messages.map((m: any) => ({ role: m.role, content: String(m.content) })),
         {
           role: 'system',
           content: `
@@ -47,16 +42,14 @@ async function chatCompletionWithFallback(openai: OpenAI, messages: Array<{ role
             color의 채도는 사용자의 감정이 격해질 수록 높아져.`
         }
       ], temperature: 0.7 });
-  } catch (e: unknown) {
-    const msg = e instanceof Error ? e.message : String(e ?? '');
-  // some error shapes include status/code
-  const errAny = e as any;
-  const status = errAny?.status || errAny?.code;
+  } catch (e: any) {
+    const msg = e?.message || '';
+    const status = e?.status || e?.code;
     const notFound = /model\s?.*does not exist|unknown model|not found/i.test(msg) || status === 404;
     if (notFound && preferred !== 'gpt-4.1-nano') {
       // 모델 미존재 시 gpt-4.1-nano로 폴백
-  return await (openai.chat.completions.create as any)({ model: 'gpt-4.1-nano', messages: [
-  ...messages.map((m: { role: string; content: unknown }) => ({ role: m.role, content: String(m.content) })),
+  return await openai.chat.completions.create({ model: 'gpt-4.1-nano', messages: [
+        ...messages.map((m: any) => ({ role: m.role, content: String(m.content) })),
         {
           role: 'system',
           content: `
@@ -137,8 +130,8 @@ async function ensureIndexes() {
   await db.collection('online_messages').createIndex({ createdAt: 1 }, { name: 'online_by_time' });
   // feedback indices
   await db.collection('emotion_color_feedback').createIndex({ userId: 1, emotion: 1, createdAt: -1 }, { name: 'by_user_emotion_time' });
-  } catch (_e) {
-    console.warn('Index creation skipped:', (_e as Error).message);
+  } catch (e) {
+    console.warn('Index creation skipped:', (e as Error).message);
   }
 }
 
@@ -146,8 +139,8 @@ function signToken(payload: { id: string; email: string }) {
   return jwt.sign({ sub: payload.id, email: payload.email }, JWT_SECRET, { expiresIn: '7d' });
 }
 
-function authMiddleware(req: AuthedRequest, res: express.Response, next: express.NextFunction) {
-  const token = (req as AuthedRequest).cookies?.token;
+function authMiddleware(req: any, res: express.Response, next: express.NextFunction) {
+  const token = req.cookies?.token;
   if (!token) return res.status(401).json({ message: '인증이 필요합니다.' });
   try {
     const decoded = jwt.verify(token, JWT_SECRET) as { sub: string; email: string };
@@ -190,7 +183,7 @@ app.post('/api/login', async (req, res) => {
     });
     return res.json({ ok: true, user: { id: String(user._id), email: user.email } });
   } catch (err: any) {
-  console.error('Login error:', err instanceof Error ? err.message : String(err));
+    console.error('Login error:', err);
     return res.status(500).json({ message: '서버 오류가 발생했습니다.' });
   }
 });
@@ -221,15 +214,15 @@ app.post('/api/register', async (req, res) => {
 });
 
 // 인증된 사용자 정보
-app.get('/api/me', authMiddleware, async (req: AuthedRequest, res) => {
+app.get('/api/me', authMiddleware, async (req: any, res) => {
   try {
     const client = await getClient();
     const db = client.db(DB_NAME);
     const users = db.collection('users');
-  const me = await users.findOne({ _id: new (await import('mongodb')).ObjectId(req.user!.sub) });
+    const me = await users.findOne({ _id: new (await import('mongodb')).ObjectId(req.user.sub) });
     if (!me) return res.status(404).json({ message: '사용자를 찾을 수 없습니다.' });
     return res.json({ ok: true, user: { id: String(me._id), email: me.email } });
-  } catch {
+  } catch (e) {
     return res.status(500).json({ message: '서버 오류가 발생했습니다.' });
   }
 });
@@ -241,11 +234,11 @@ app.post('/api/logout', (req, res) => {
 });
 
 // 채팅 메시지 저장/조회 (사용자별)
-app.get('/api/chat', authMiddleware, async (req: AuthedRequest, res) => {
+app.get('/api/chat', authMiddleware, async (req: any, res) => {
   try {
     const client = await getClient();
     const db = client.db(DB_NAME);
-  const userId = req.user!.sub;
+    const userId = req.user.sub;
     const items = await db
       .collection('messages')
       .find({ userId })
@@ -253,28 +246,28 @@ app.get('/api/chat', authMiddleware, async (req: AuthedRequest, res) => {
       .limit(200)
       .toArray();
     res.json({ ok: true, items });
-  } catch {
+  } catch (e) {
     res.status(500).json({ message: '메시지 조회 중 오류가 발생했습니다.' });
   }
 });
 
-app.post('/api/chat', authMiddleware, async (req: AuthedRequest, res) => {
+app.post('/api/chat', authMiddleware, async (req: any, res) => {
   try {
     const { text } = req.body || {};
     if (!text || typeof text !== 'string') return res.status(400).json({ message: 'text가 필요합니다.' });
     const client = await getClient();
     const db = client.db(DB_NAME);
-  const userId = req.user!.sub;
+    const userId = req.user.sub;
     const doc = { userId, text, createdAt: new Date() };
     const result = await db.collection('messages').insertOne(doc);
     res.status(201).json({ ok: true, item: { ...doc, _id: result.insertedId } });
-  } catch {
+  } catch (e) {
     res.status(500).json({ message: '메시지 저장 중 오류가 발생했습니다.' });
   }
 });
 
 // AI Chat proxy: POST /api/ai/chat { messages: [{role, content}], model? }
-app.post('/api/ai/chat', authMiddleware, async (req: AuthedRequest, res) => {
+app.post('/api/ai/chat', authMiddleware, async (req: any, res) => {
   try {
     if (!OPENAI_API_KEY) return res.status(500).json({ message: 'OPENAI_API_KEY 미설정' });
     const { messages, model } = req.body || {};
@@ -284,7 +277,7 @@ app.post('/api/ai/chat', authMiddleware, async (req: AuthedRequest, res) => {
     const openai = new OpenAI({ apiKey: OPENAI_API_KEY });
     const resp = await chatCompletionWithFallback(
       openai,
-      messages.map((m: { role: string; content: unknown }) => ({ role: m.role, content: String(m.content) })),
+      messages.map((m: any) => ({ role: m.role, content: String(m.content) })),
       model
     );
     const content = resp.choices?.[0]?.message?.content ?? '';
@@ -292,7 +285,7 @@ app.post('/api/ai/chat', authMiddleware, async (req: AuthedRequest, res) => {
     try {
       const client = await getClient();
       const db = client.db(DB_NAME);
-  const userId = req.user!.sub;
+      const userId = req.user.sub;
       const last = messages[messages.length - 1];
       if (last?.role === 'user') {
         await db.collection('ai_messages').insertOne({ userId, role: 'user', content: String(last.content || ''), createdAt: new Date() });
@@ -301,18 +294,19 @@ app.post('/api/ai/chat', authMiddleware, async (req: AuthedRequest, res) => {
     } catch (persistErr) {
       console.warn('persist ai_messages failed:', (persistErr as Error).message);
     }
-  } catch (e: unknown) {
-    console.error('AI chat error:', e instanceof Error ? e.message : String(e));
+    res.json({ ok: true, content });
+  } catch (e: any) {
+    console.error('AI chat error:', e?.message || e);
     res.status(500).json({ message: 'AI 응답 생성 중 오류' });
   }
 });
 
 // AI chat history
-app.get('/api/ai/history', authMiddleware, async (req: AuthedRequest, res) => {
+app.get('/api/ai/history', authMiddleware, async (req: any, res) => {
   try {
     const client = await getClient();
     const db = client.db(DB_NAME);
-  const userId = req.user!.sub;
+    const userId = req.user.sub;
     const items = await db
       .collection('ai_messages')
       .find({ userId })
@@ -321,7 +315,7 @@ app.get('/api/ai/history', authMiddleware, async (req: AuthedRequest, res) => {
       .project({ _id: 0, userId: 0 })
       .toArray();
     res.json({ ok: true, items });
-  } catch {
+  } catch (e) {
     res.status(500).json({ message: 'AI 대화 이력 조회 오류' });
   }
 });
@@ -339,7 +333,7 @@ app.get('/api/health', async (_req, res) => {
 // =====================
 // Online group chat (simple)
 // =====================
-app.get('/api/online/messages', authMiddleware, async (req: AuthedRequest, res) => {
+app.get('/api/online/messages', authMiddleware, async (req: any, res) => {
   try {
     const client = await getClient();
     const db = client.db(DB_NAME);
@@ -350,12 +344,12 @@ app.get('/api/online/messages', authMiddleware, async (req: AuthedRequest, res) 
       .limit(300)
       .toArray();
     res.json({ ok: true, items: items.map((m: any) => ({ id: String(m._id), user: m.user, text: m.text, createdAt: m.createdAt })) });
-  } catch {
+  } catch (e) {
     res.status(500).json({ message: '온라인 메시지 조회 오류' });
   }
 });
 
-app.post('/api/online/message', authMiddleware, async (req: AuthedRequest, res) => {
+app.post('/api/online/message', authMiddleware, async (req: any, res) => {
   try {
     const text = String(req.body?.text || '').trim();
     if (!text) return res.status(400).json({ message: 'text가 필요합니다.' });
@@ -365,7 +359,7 @@ app.post('/api/online/message', authMiddleware, async (req: AuthedRequest, res) 
     const doc = { user, text, createdAt: new Date() };
     const r = await db.collection('online_messages').insertOne(doc);
     res.status(201).json({ ok: true, id: String(r.insertedId) });
-  } catch {
+  } catch (e) {
     res.status(500).json({ message: '온라인 메시지 저장 오류' });
   }
 });
@@ -375,7 +369,7 @@ app.post('/api/online/message', authMiddleware, async (req: AuthedRequest, res) 
 // =====================
 
 type DiaryDoc = {
-  _id?: ObjectId;
+  _id?: any;
   userId: string;
   date: string; // YYYY-MM-DD
   title?: string;
@@ -391,7 +385,7 @@ function toDateKey(d: Date) {
   return `${y}-${m}-${day}`;
 }
 
-async function getOrCreateDiary(db: Db, userId: string, dateKey: string): Promise<DiaryDoc> {
+async function getOrCreateDiary(db: any, userId: string, dateKey: string): Promise<DiaryDoc> {
   const col = db.collection('diaries');
   const found = (await col.findOne({ userId, date: dateKey })) as DiaryDoc | null;
   if (found) return found;
@@ -520,7 +514,7 @@ function mixHex(a:string,b:string,w:number){
 }
 
 // Compute a personalized color for an emotion using recent accepted/corrected feedback
-async function personalizedColorForEmotion(db: Db, userId: string, baseColor: string, emotion: string){
+async function personalizedColorForEmotion(db: any, userId: string, baseColor: string, emotion: string){
   try{
     const canonical = normalizeEmotionKey(emotion);
     const fb = await db.collection('emotion_color_feedback')
@@ -562,11 +556,10 @@ async function detectEmotionFromText(text: string): Promise<{ emotion: string; s
       temperature: 0,
     });
     const raw = resp.choices?.[0]?.message?.content || '{}';
-  let parsed: unknown = {};
-  try { parsed = JSON.parse(raw); } catch { parsed = {}; }
-  const p: any = parsed as any;
-  const emotion = (p.emotion || 'neutral').toLowerCase();
-  const score = Math.max(0, Math.min(100, Number(p.score) || 0));
+    let parsed: any = {};
+    try { parsed = JSON.parse(raw); } catch { parsed = {}; }
+    const emotion = (parsed.emotion || 'neutral').toLowerCase();
+    const score = Math.max(0, Math.min(100, Number(parsed.score) || 0));
     const color = EMOTION_COLORS[emotion] || EMOTION_COLORS.neutral;
     return { emotion, score, color };
   } catch {
@@ -576,11 +569,11 @@ async function detectEmotionFromText(text: string): Promise<{ emotion: string; s
 
 // -------- Feedback endpoints --------
 // POST /api/feedback/color { text, emotion, colorHex, accepted, correctedColorHex? }
-app.post('/api/feedback/color', authMiddleware, async (req: AuthedRequest, res) => {
+app.post('/api/feedback/color', authMiddleware, async (req: any, res) => {
   try{
     const client = await getClient();
     const db = client.db(DB_NAME);
-  const userId = req.user!.sub;
+    const userId = req.user.sub;
     const body = req.body || {};
   const emotion = normalizeEmotionKey(String(body.emotion||''));
     const colorHex = String(body.colorHex||'').trim();
@@ -590,34 +583,32 @@ app.post('/api/feedback/color', authMiddleware, async (req: AuthedRequest, res) 
   const doc = { userId, emotion, colorHex: colorHex.startsWith('#')?colorHex:`#${colorHex}`, accepted, correctedColorHex: correctedColorHex? (correctedColorHex.startsWith('#')?correctedColorHex:`#${correctedColorHex}`) : null, createdAt: new Date() };
     await db.collection('emotion_color_feedback').insertOne(doc);
     res.status(201).json({ ok:true });
-  } catch { res.status(500).json({ ok: false, message: '피드백 저장 오류' }); }
+  }catch(e){ res.status(500).json({ ok:false, message:'피드백 저장 오류' }); }
 });
 
 // GET /api/mood/palette -> 최근 개인 팔레트 프리뷰
-app.get('/api/mood/palette', authMiddleware, async (req: AuthedRequest, res) => {
-  try {
+app.get('/api/mood/palette', authMiddleware, async (req:any,res)=>{
+  try{
     const client = await getClient();
     const db = client.db(DB_NAME);
-    const userId = req.user!.sub;
-    const emotions = [...CANONICAL_EMOTIONS];
-    const items: { emotion: string; base: string; personalized: string }[] = [];
-    for (const emo of emotions) {
+    const userId = req.user.sub;
+  const emotions = [...CANONICAL_EMOTIONS];
+    const items = [] as any[];
+    for(const emo of emotions){
       const base = EMOTION_COLORS[emo];
       const personalized = await personalizedColorForEmotion(db, userId, base, emo);
       items.push({ emotion: emo, base, personalized });
     }
-    res.json({ ok: true, items });
-  } catch {
-    res.status(500).json({ ok: false, message: '팔레트 조회 오류' });
-  }
+    res.json({ ok:true, items });
+  }catch{ res.status(500).json({ ok:false, message:'팔레트 조회 오류' }); }
 });
 
 // GET /api/diary/list -> 최근 순 목록
-app.get('/api/diary/list', authMiddleware, async (req: AuthedRequest, res) => {
+app.get('/api/diary/list', authMiddleware, async (req: any, res) => {
   try {
     const client = await getClient();
     const db = client.db(DB_NAME);
-  const userId = req.user!.sub;
+    const userId = req.user.sub;
     const diaries = await db
       .collection('diaries')
       .find({ userId })
@@ -646,17 +637,17 @@ app.get('/api/diary/list', authMiddleware, async (req: AuthedRequest, res) => {
       preview: (map.get(String(d._id))?.content || '').slice(0, 80),
     }));
     res.json({ ok: true, items });
-  } catch {
+  } catch (e) {
     res.status(500).json({ message: '다이어리 목록 조회 오류' });
   }
 });
 
 // GET /api/diary/:date -> 해당 날짜의 문서와 메시지
-app.get('/api/diary/:date(\\d{4}-\\d{2}-\\d{2})', authMiddleware, async (req: AuthedRequest, res) => {
+app.get('/api/diary/:date(\\d{4}-\\d{2}-\\d{2})', authMiddleware, async (req: any, res) => {
   try {
     const client = await getClient();
     const db = client.db(DB_NAME);
-  const userId = req.user!.sub;
+    const userId = req.user.sub;
     const dateKey = String(req.params.date || '').trim();
     if (!/^\d{4}-\d{2}-\d{2}$/.test(dateKey)) return res.status(400).json({ message: 'date 형식은 YYYY-MM-DD' });
 
@@ -668,7 +659,7 @@ app.get('/api/diary/:date(\\d{4}-\\d{2}-\\d{2})', authMiddleware, async (req: Au
       .project({ diaryId: 0, userId: 0 })
       .toArray();
     res.json({ ok: true, diary: { id: String(diary._id), date: diary.date, title: diary.title || '', mood: diary.mood, lastUpdatedAt: diary.lastUpdatedAt }, messages: msgs.map(m => ({ id: String(m._id), role: m.role, content: m.content, createdAt: m.createdAt })) });
-  } catch {
+  } catch (e) {
     res.status(500).json({ message: '다이어리 조회 오류' });
   }
 });
@@ -676,7 +667,7 @@ app.get('/api/diary/:date(\\d{4}-\\d{2}-\\d{2})', authMiddleware, async (req: Au
 // POST /api/diary/:date/chat { text }
 //   - 유저 메시지를 저장하고, AI 응답 생성 후 저장
 //   - 감정/색 탐지 후 다이어리 문서 업데이트
-app.post('/api/diary/:date(\\d{4}-\\d{2}-\\d{2})/chat', authMiddleware, async (req: AuthedRequest, res) => {
+app.post('/api/diary/:date(\\d{4}-\\d{2}-\\d{2})/chat', authMiddleware, async (req: any, res) => {
   try {
     if (!OPENAI_API_KEY) return res.status(500).json({ message: 'OPENAI_API_KEY 미설정' });
     const { text } = req.body || {};
@@ -686,7 +677,7 @@ app.post('/api/diary/:date(\\d{4}-\\d{2}-\\d{2})/chat', authMiddleware, async (r
 
     const client = await getClient();
     const db = client.db(DB_NAME);
-  const userId = req.user!.sub;
+    const userId = req.user.sub;
     const diary = await getOrCreateDiary(db, userId, dateKey);
 
     // 1) 유저 메시지 저장
@@ -724,8 +715,8 @@ app.post('/api/diary/:date(\\d{4}-\\d{2}-\\d{2})/chat', authMiddleware, async (r
     );
 
     res.status(201).json({ ok: true, user: userDoc, assistant: asstDoc, mood: finalMood });
-  } catch (_e) {
-    console.error('diary chat error:', (_e as Error).message);
+  } catch (e) {
+    console.error('diary chat error:', (e as Error).message);
     res.status(500).json({ message: '다이어리 채팅 처리 오류' });
   }
 });
@@ -739,35 +730,50 @@ type DiarySession = {
   userId: string;
   date: string; // YYYY-MM-DD
   title?: string;
+  type?: 'ai' | 'online'; // 세션 타입: AI 대화 또는 온라인 채팅
   mood?: { emotion: string; score: number; color: string } | null;
   createdAt: Date;
   lastUpdatedAt: Date;
 };
 
 // POST /api/diary/session { date? }
-app.post('/api/diary/session', authMiddleware, async (req: AuthedRequest, res) => {
+app.post('/api/diary/session', authMiddleware, async (req: any, res) => {
   try {
     const client = await getClient();
     const db = client.db(DB_NAME);
-  const userId = req.user!.sub;
+    const userId = req.user.sub;
     const date = (req.body?.date && /^\d{4}-\d{2}-\d{2}$/.test(req.body.date)) ? req.body.date : toDateKey(new Date());
-    const doc: DiarySession = { userId, date, title: '', mood: null, createdAt: new Date(), lastUpdatedAt: new Date() };
+    const type = (req.body?.type === 'online') ? 'online' : 'ai'; // 기본값: ai
+    const title = String(req.body?.title || '').slice(0, 100);
+    const doc: DiarySession = { userId, date, title, type, mood: null, createdAt: new Date(), lastUpdatedAt: new Date() };
     const r = await db.collection('diary_sessions').insertOne(doc);
     res.status(201).json({ ok: true, id: String(r.insertedId) });
-  } catch {
+  } catch (e) {
     res.status(500).json({ message: '세션 생성 오류' });
   }
 });
 
-// GET /api/diary/sessions
-app.get('/api/diary/sessions', authMiddleware, async (req: AuthedRequest, res) => {
+// GET /api/diary/sessions?type=ai|online (type 필터 선택 가능)
+app.get('/api/diary/sessions', authMiddleware, async (req: any, res) => {
   try {
     const client = await getClient();
     const db = client.db(DB_NAME);
-  const userId = req.user!.sub;
+    const userId = req.user.sub;
+    const typeFilter = req.query.type;
+    const query: any = { userId };
+    
+    // type 필터가 있으면 적용
+    if (typeFilter === 'ai') {
+      // AI 대화: type이 'ai'이거나 type이 없는 것(기존 세션)
+      query.$or = [{ type: 'ai' }, { type: { $exists: false } }, { type: null }];
+    } else if (typeFilter === 'online') {
+      // 온라인 채팅: type이 정확히 'online'인 것만
+      query.type = 'online';
+    }
+    
     const sessions = await db
       .collection('diary_sessions')
-      .find({ userId })
+      .find(query)
       .sort({ lastUpdatedAt: -1 })
       .limit(300)
       .toArray();
@@ -781,22 +787,22 @@ app.get('/api/diary/sessions', authMiddleware, async (req: AuthedRequest, res) =
     const map = new Map<string, any>();
     for (const p of previews) map.set(String(p._id), p.last);
     res.json({ ok: true, items: sessions.map((s: any) => ({
-      _id: String(s._id), date: s.date, title: s.title || '', mood: s.mood || null, lastUpdatedAt: s.lastUpdatedAt,
+      _id: String(s._id), date: s.date, title: s.title || '', type: s.type, mood: s.mood || null, lastUpdatedAt: s.lastUpdatedAt,
       preview: (map.get(String(s._id))?.content || '').slice(0, 80),
     })) });
-  } catch {
+  } catch (e) {
     res.status(500).json({ message: '세션 목록 조회 오류' });
   }
 });
 
 // GET /api/diary/session/:id
-app.get('/api/diary/session/:id', authMiddleware, async (req: AuthedRequest, res) => {
+app.get('/api/diary/session/:id', authMiddleware, async (req: any, res) => {
   try {
     const id = String(req.params.id || '').trim();
     if (!ObjectId.isValid(id)) return res.status(400).json({ message: '유효하지 않은 ID' });
     const client = await getClient();
     const db = client.db(DB_NAME);
-  const userId = req.user!.sub;
+    const userId = req.user.sub;
     const session = await db.collection('diary_sessions').findOne({ _id: new ObjectId(id), userId });
     if (!session) return res.status(404).json({ message: '세션을 찾을 수 없습니다.' });
     const msgs = await db
@@ -805,13 +811,13 @@ app.get('/api/diary/session/:id', authMiddleware, async (req: AuthedRequest, res
       .sort({ createdAt: 1 })
       .toArray();
     res.json({ ok: true, session: { id: String(session._id), date: session.date, title: session.title || '', mood: session.mood || null, lastUpdatedAt: session.lastUpdatedAt }, messages: msgs.map(m => ({ id: String(m._id), role: m.role, content: m.content, createdAt: m.createdAt })) });
-  } catch {
+  } catch (e) {
     res.status(500).json({ message: '세션 조회 오류' });
   }
 });
 
 // POST /api/diary/session/:id/chat { text }
-app.post('/api/diary/session/:id/chat', authMiddleware, async (req: AuthedRequest, res) => {
+app.post('/api/diary/session/:id/chat', authMiddleware, async (req: any, res) => {
   try {
     if (!OPENAI_API_KEY) return res.status(500).json({ message: 'OPENAI_API_KEY 미설정' });
     const id = String(req.params.id || '').trim();
@@ -819,9 +825,10 @@ app.post('/api/diary/session/:id/chat', authMiddleware, async (req: AuthedReques
     if (!ObjectId.isValid(id) || !text) return res.status(400).json({ message: '입력값 오류' });
     const client = await getClient();
     const db = client.db(DB_NAME);
-  const userId = req.user!.sub;
+    const userId = req.user.sub;
     const session = await db.collection('diary_sessions').findOne({ _id: new ObjectId(id), userId });
     if (!session) return res.status(404).json({ message: '세션을 찾을 수 없습니다.' });
+    
     // save user msg
     await db.collection('diary_session_messages').insertOne({ sessionId: session._id, userId, role: 'user', content: text, createdAt: new Date() });
     const history = await db.collection('diary_session_messages').find({ sessionId: session._id }).sort({ createdAt: 1 }).toArray();
@@ -829,83 +836,244 @@ app.post('/api/diary/session/:id/chat', authMiddleware, async (req: AuthedReques
       { role: 'system', content: '당신은 공감적이고 상냥한 상담 동반자입니다. 짧고 따뜻하게, 한국어로 답하세요.' },
       ...history.slice(-20).map((m: any) => ({ role: m.role, content: m.content })),
     ];
+    
     const openai = new OpenAI({ apiKey: OPENAI_API_KEY });
-  const completion = await chatCompletionWithFallback(openai, messages);
-    const reply = completion.choices?.[0]?.message?.content || '';
-    await db.collection('diary_session_messages').insertOne({ sessionId: session._id, userId, role: 'assistant', content: reply, createdAt: new Date() });
-  const mood = await detectEmotionFromText(text);
-  const personalizedColor = await personalizedColorForEmotion(db, userId, mood.color, mood.emotion);
-  const finalMood = { ...mood, color: personalizedColor };
-  await db.collection('diary_sessions').updateOne({ _id: session._id }, { $set: { mood: finalMood, lastUpdatedAt: new Date() } });
-  res.status(201).json({ ok: true, assistant: { content: reply }, mood: finalMood });
+    const completion = await chatCompletionWithFallback(openai, messages);
+    const rawReply = completion.choices?.[0]?.message?.content || '';
+    
+    // AI 응답에서 {"color":"#..."} 추출
+    let extractedColor: string | null = null;
+    let cleanReply = rawReply;
+    const colorMatch = rawReply.match(/\{"color"\s*:\s*"(#[0-9a-fA-F]{6})"\}/);
+    if (colorMatch) {
+      extractedColor = colorMatch[1];
+      cleanReply = rawReply.replace(colorMatch[0], '').trim();
+      console.log('🎨 AI가 선택한 색상:', extractedColor);
+    }
+    
+    await db.collection('diary_session_messages').insertOne({ sessionId: session._id, userId, role: 'assistant', content: cleanReply, createdAt: new Date() });
+    
+    // 감정 분석: 매 메시지마다 업데이트 (AI가 준 색상 우선 사용)
+    let finalMood = session.mood || null;
+    const totalMessages = history.length + 1;
+    const minMessages = 10;
+    
+    // AI가 색상을 제공했다면 즉시 사용
+    if (extractedColor) {
+      const allUserMessages = history
+        .filter((m: any) => m.role === 'user')
+        .map((m: any) => m.content)
+        .join(' ');
+      const mood = await detectEmotionFromText(allUserMessages);
+      finalMood = { ...mood, color: extractedColor }; // AI가 준 색상 사용!
+      console.log('✨ 최종 감정:', finalMood);
+      
+      await db.collection('diary_sessions').updateOne(
+        { _id: session._id }, 
+        { $set: { mood: finalMood, lastUpdatedAt: new Date() } }
+      );
+    } else if (totalMessages >= minMessages && !session.mood) {
+      // AI가 색상을 안 줬고, 최소 메시지 이상이면 기존 로직 사용
+      const allUserMessages = history
+        .filter((m: any) => m.role === 'user')
+        .map((m: any) => m.content)
+        .join(' ');
+      const mood = await detectEmotionFromText(allUserMessages);
+      const personalizedColor = await personalizedColorForEmotion(db, userId, mood.color, mood.emotion);
+      finalMood = { ...mood, color: personalizedColor };
+      
+      await db.collection('diary_sessions').updateOne(
+        { _id: session._id }, 
+        { $set: { mood: finalMood, lastUpdatedAt: new Date() } }
+      );
+    } else {
+      // 분석 전이거나 이미 분석된 경우 타임스탬프만 업데이트
+      await db.collection('diary_sessions').updateOne(
+        { _id: session._id }, 
+        { $set: { lastUpdatedAt: new Date() } }
+      );
+    }
+    
+    res.status(201).json({ 
+      ok: true, 
+      assistant: { content: cleanReply }, 
+      mood: finalMood,
+      messageCount: totalMessages,
+      minRequired: minMessages,
+      canAnalyze: totalMessages >= minMessages,
+      extractedColor: extractedColor // 디버깅용
+    });
   } catch (e: any) {
     console.error('session chat error:', e?.message || e);
     res.status(500).json({ message: '세션 채팅 처리 오류' });
   }
 });
 
+// POST /api/diary/session/:id/analyze - 수동 감정 분석 (최소 메시지 수 없이)
+app.post('/api/diary/session/:id/analyze', authMiddleware, async (req: any, res) => {
+  try {
+    if (!OPENAI_API_KEY) return res.status(500).json({ message: 'OPENAI_API_KEY 미설정' });
+    const id = String(req.params.id || '').trim();
+    if (!ObjectId.isValid(id)) return res.status(400).json({ message: '유효하지 않은 ID' });
+    
+    const client = await getClient();
+    const db = client.db(DB_NAME);
+    const userId = req.user.sub;
+    const session = await db.collection('diary_sessions').findOne({ _id: new ObjectId(id), userId });
+    if (!session) return res.status(404).json({ message: '세션을 찾을 수 없습니다.' });
+    
+    // 최소 2개 메시지 필요 (1턴)
+    const history = await db.collection('diary_session_messages')
+      .find({ sessionId: session._id })
+      .sort({ createdAt: 1 })
+      .toArray();
+    
+    if (history.length < 2) {
+      return res.status(400).json({ message: '최소 1턴(2개 메시지) 이상 대화가 필요합니다.' });
+    }
+    
+    // 전체 대화 내용을 하나의 텍스트로 결합
+    const allUserMessages = history
+      .filter((m: any) => m.role === 'user')
+      .map((m: any) => m.content)
+      .join(' ');
+    
+    // 전체 대화 흐름을 기반으로 감정 분석
+    const mood = await detectEmotionFromText(allUserMessages);
+    const personalizedColor = await personalizedColorForEmotion(db, userId, mood.color, mood.emotion);
+    const finalMood = { ...mood, color: personalizedColor };
+    
+    await db.collection('diary_sessions').updateOne(
+      { _id: session._id }, 
+      { $set: { mood: finalMood, lastUpdatedAt: new Date() } }
+    );
+    
+    res.status(200).json({ 
+      ok: true, 
+      mood: finalMood,
+      messageCount: history.length
+    });
+  } catch (e: any) {
+    console.error('manual analyze error:', e?.message || e);
+    res.status(500).json({ message: '감정 분석 오류' });
+  }
+});
+
 // PATCH /api/diary/session/:id { title }
-app.patch('/api/diary/session/:id', authMiddleware, async (req: AuthedRequest, res) => {
+app.patch('/api/diary/session/:id', authMiddleware, async (req: any, res) => {
   try {
     const id = String(req.params.id || '').trim();
     if (!ObjectId.isValid(id)) return res.status(400).json({ message: '유효하지 않은 ID' });
     const title = String((req.body?.title ?? '')).slice(0, 100);
     const client = await getClient();
     const db = client.db(DB_NAME);
-  const userId = req.user!.sub;
+    const userId = req.user.sub;
     const r = await db.collection('diary_sessions').updateOne({ _id: new ObjectId(id), userId }, { $set: { title, lastUpdatedAt: new Date() } });
     if (!r.matchedCount) return res.status(404).json({ message: '세션 없음' });
     res.json({ ok: true });
-  } catch {
+  } catch (e) {
     res.status(500).json({ message: '세션 제목 업데이트 오류' });
   }
 });
 
 // DELETE /api/diary/session/:id/messages (clear all)
-app.delete('/api/diary/session/:id/messages', authMiddleware, async (req: AuthedRequest, res) => {
+app.delete('/api/diary/session/:id/messages', authMiddleware, async (req: any, res) => {
   try {
     const id = String(req.params.id || '').trim();
     if (!ObjectId.isValid(id)) return res.status(400).json({ message: '유효하지 않은 ID' });
     const client = await getClient();
     const db = client.db(DB_NAME);
-  const userId = req.user!.sub;
+    const userId = req.user.sub;
     await db.collection('diary_session_messages').deleteMany({ sessionId: new ObjectId(id), userId });
     res.json({ ok: true });
-  } catch {
+  } catch (e) {
     res.status(500).json({ message: '세션 대화 삭제 오류' });
   }
 });
 
 // DELETE /api/diary/session/:id/messages/:mid
-app.delete('/api/diary/session/:id/messages/:mid', authMiddleware, async (req: AuthedRequest, res) => {
+app.delete('/api/diary/session/:id/messages/:mid', authMiddleware, async (req: any, res) => {
   try {
     const id = String(req.params.id || '').trim();
     const mid = String(req.params.mid || '').trim();
     if (!ObjectId.isValid(id) || !ObjectId.isValid(mid)) return res.status(400).json({ message: '유효하지 않은 ID' });
     const client = await getClient();
     const db = client.db(DB_NAME);
-  const userId = req.user!.sub;
+    const userId = req.user.sub;
     const r = await db.collection('diary_session_messages').deleteOne({ _id: new ObjectId(mid), sessionId: new ObjectId(id), userId });
     if (!r.deletedCount) return res.status(404).json({ message: '메시지 없음' });
     res.json({ ok: true });
-  } catch {
+  } catch (e) {
     res.status(500).json({ message: '세션 메시지 삭제 오류' });
   }
 });
 
+// POST /api/diary/session/:id/import { messages: [{ role, content }, ...] }
+// Chat.tsx에서 완료된 대화를 다이어리로 가져오기
+app.post('/api/diary/session/:id/import', authMiddleware, async (req: any, res) => {
+  try {
+    const id = String(req.params.id || '').trim();
+    const messages = req.body?.messages;
+    if (!ObjectId.isValid(id)) return res.status(400).json({ message: '유효하지 않은 세션 ID' });
+    if (!Array.isArray(messages) || messages.length === 0) return res.status(400).json({ message: 'messages 배열이 필요합니다.' });
+    
+    const client = await getClient();
+    const db = client.db(DB_NAME);
+    const userId = req.user.sub;
+    
+    // 세션 존재 확인
+    const session = await db.collection('diary_sessions').findOne({ _id: new ObjectId(id), userId });
+    if (!session) return res.status(404).json({ message: '세션을 찾을 수 없습니다.' });
+    
+    // 메시지들을 bulk insert
+    const docs = messages
+      .filter((m: any) => m.role && m.content && (m.role === 'user' || m.role === 'assistant'))
+      .map((m: any) => ({
+        sessionId: session._id,
+        userId,
+        role: m.role,
+        content: String(m.content),
+        createdAt: new Date()
+      }));
+    
+    if (docs.length === 0) return res.status(400).json({ message: '유효한 메시지가 없습니다.' });
+    
+    await db.collection('diary_session_messages').insertMany(docs);
+    
+    // 마지막 사용자 메시지로 감정 분석
+    const lastUserMsg = messages.filter((m: any) => m.role === 'user').slice(-1)[0];
+    if (lastUserMsg?.content) {
+      const mood = await detectEmotionFromText(lastUserMsg.content);
+      const personalizedColor = await personalizedColorForEmotion(db, userId, mood.color, mood.emotion);
+      const finalMood = { ...mood, color: personalizedColor };
+      await db.collection('diary_sessions').updateOne(
+        { _id: session._id },
+        { $set: { mood: finalMood, lastUpdatedAt: new Date() } }
+      );
+      return res.status(201).json({ ok: true, imported: docs.length, mood: finalMood });
+    }
+    
+    await db.collection('diary_sessions').updateOne({ _id: session._id }, { $set: { lastUpdatedAt: new Date() } });
+    res.status(201).json({ ok: true, imported: docs.length });
+  } catch (e: any) {
+    console.error('import error:', e?.message || e);
+    res.status(500).json({ message: '메시지 가져오기 오류' });
+  }
+});
+
 // POST /api/diary/session/:id/continue
-app.post('/api/diary/session/:id/continue', authMiddleware, async (req: AuthedRequest, res) => {
+app.post('/api/diary/session/:id/continue', authMiddleware, async (req: any, res) => {
   try {
     if (!OPENAI_API_KEY) return res.status(500).json({ message: 'OPENAI_API_KEY 미설정' });
     const id = String(req.params.id || '').trim();
     if (!ObjectId.isValid(id)) return res.status(400).json({ message: '유효하지 않은 ID' });
     const client = await getClient();
     const db = client.db(DB_NAME);
-  const userId = req.user!.sub;
+    const userId = req.user.sub;
     const history = await db.collection('diary_session_messages').find({ sessionId: new ObjectId(id), userId }).sort({ createdAt: 1 }).toArray();
     const messages = [
       { role: 'system', content: '당신은 공감적이고 상냥한 상담 동반자입니다. 한국어로 부드럽게 이어서 말하세요.' },
-  ...history.slice(-20).map((m) => ({ role: String((m as any).role || ''), content: String((m as any).content || '') })),
+      ...history.slice(-20).map((m: any) => ({ role: m.role, content: m.content })),
       { role: 'user', content: '조금만 더 이야기해 줄래?' },
     ];
     const openai = new OpenAI({ apiKey: OPENAI_API_KEY });
@@ -914,20 +1082,20 @@ app.post('/api/diary/session/:id/continue', authMiddleware, async (req: AuthedRe
     await db.collection('diary_session_messages').insertOne({ sessionId: new ObjectId(id), userId, role: 'assistant', content: reply, createdAt: new Date() });
     await db.collection('diary_sessions').updateOne({ _id: new ObjectId(id) }, { $set: { lastUpdatedAt: new Date() } });
     res.status(201).json({ ok: true, assistant: { content: reply } });
-  } catch (e: unknown) {
-    console.error('session continue error:', e instanceof Error ? e.message : String(e));
+  } catch (e: any) {
+    console.error('session continue error:', e?.message || e);
     res.status(500).json({ message: '세션 추가 생성 오류' });
   }
 });
 
 // DELETE /api/diary/session/:id — delete a session and all its messages
-app.delete('/api/diary/session/:id', authMiddleware, async (req: AuthedRequest, res) => {
+app.delete('/api/diary/session/:id', authMiddleware, async (req: any, res) => {
   try {
     const id = String(req.params.id || '').trim();
     if (!ObjectId.isValid(id)) return res.status(400).json({ message: '유효하지 않은 ID' });
     const client = await getClient();
     const db = client.db(DB_NAME);
-  const userId = req.user!.sub;
+    const userId = req.user.sub;
     const session = await db.collection('diary_sessions').findOne({ _id: new ObjectId(id), userId });
     if (!session) return res.status(404).json({ message: '세션을 찾을 수 없습니다.' });
     await db.collection('diary_session_messages').deleteMany({ sessionId: new ObjectId(id), userId });
@@ -939,14 +1107,14 @@ app.delete('/api/diary/session/:id', authMiddleware, async (req: AuthedRequest, 
 });
 
 // PATCH /api/diary/:date { title }
-app.patch('/api/diary/:date(\\d{4}-\\d{2}-\\d{2})', authMiddleware, async (req: AuthedRequest, res) => {
+app.patch('/api/diary/:date(\\d{4}-\\d{2}-\\d{2})', authMiddleware, async (req: any, res) => {
   try {
     const dateKey = String(req.params.date || '').trim();
     if (!/^\d{4}-\d{2}-\d{2}$/.test(dateKey)) return res.status(400).json({ message: 'date 형식은 YYYY-MM-DD' });
     const title = String((req.body?.title ?? '')).slice(0, 100);
     const client = await getClient();
     const db = client.db(DB_NAME);
-  const userId = req.user!.sub;
+    const userId = req.user.sub;
     const diary = await getOrCreateDiary(db, userId, dateKey);
     await db.collection('diaries').updateOne({ _id: diary._id }, { $set: { title, lastUpdatedAt: new Date() } });
     res.json({ ok: true });
@@ -956,13 +1124,13 @@ app.patch('/api/diary/:date(\\d{4}-\\d{2}-\\d{2})', authMiddleware, async (req: 
 });
 
 // DELETE /api/diary/:date/messages — clear all messages for date
-app.delete('/api/diary/:date(\\d{4}-\\d{2}-\\d{2})/messages', authMiddleware, async (req: AuthedRequest, res) => {
+app.delete('/api/diary/:date(\\d{4}-\\d{2}-\\d{2})/messages', authMiddleware, async (req: any, res) => {
   try {
     const dateKey = String(req.params.date || '').trim();
     if (!/^\d{4}-\d{2}-\d{2}$/.test(dateKey)) return res.status(400).json({ message: 'date 형식은 YYYY-MM-DD' });
     const client = await getClient();
     const db = client.db(DB_NAME);
-  const diary = await getOrCreateDiary(db, req.user!.sub, dateKey);
+    const diary = await getOrCreateDiary(db, req.user.sub, dateKey);
     await db.collection('diary_messages').deleteMany({ diaryId: diary._id });
     res.json({ ok: true });
   } catch (e) {
@@ -971,7 +1139,7 @@ app.delete('/api/diary/:date(\\d{4}-\\d{2}-\\d{2})/messages', authMiddleware, as
 });
 
 // DELETE /api/diary/:date/messages/:id — delete one message
-app.delete('/api/diary/:date(\\d{4}-\\d{2}-\\d{2})/messages/:id', authMiddleware, async (req: AuthedRequest, res) => {
+app.delete('/api/diary/:date(\\d{4}-\\d{2}-\\d{2})/messages/:id', authMiddleware, async (req: any, res) => {
   try {
     const dateKey = String(req.params.date || '').trim();
     const id = String(req.params.id || '').trim();
@@ -979,7 +1147,7 @@ app.delete('/api/diary/:date(\\d{4}-\\d{2}-\\d{2})/messages/:id', authMiddleware
     if (!id || !ObjectId.isValid(id)) return res.status(400).json({ message: '유효하지 않은 메시지 ID' });
     const client = await getClient();
     const db = client.db(DB_NAME);
-  const diary = await getOrCreateDiary(db, req.user!.sub, dateKey);
+    const diary = await getOrCreateDiary(db, req.user.sub, dateKey);
     const r = await db.collection('diary_messages').deleteOne({ _id: new ObjectId(id), diaryId: diary._id });
     if (r.deletedCount === 0) return res.status(404).json({ message: '메시지를 찾을 수 없습니다.' });
     res.json({ ok: true });
@@ -989,14 +1157,14 @@ app.delete('/api/diary/:date(\\d{4}-\\d{2}-\\d{2})/messages/:id', authMiddleware
 });
 
 // POST /api/diary/:date/continue — generate an additional assistant reply
-app.post('/api/diary/:date/continue', authMiddleware, async (req: AuthedRequest, res) => {
+app.post('/api/diary/:date/continue', authMiddleware, async (req: any, res) => {
   try {
     if (!OPENAI_API_KEY) return res.status(500).json({ message: 'OPENAI_API_KEY 미설정' });
     const dateKey = String(req.params.date || '').trim();
     if (!/^\d{4}-\d{2}-\d{2}$/.test(dateKey)) return res.status(400).json({ message: 'date 형식은 YYYY-MM-DD' });
     const client = await getClient();
     const db = client.db(DB_NAME);
-  const userId = req.user!.sub;
+    const userId = req.user.sub;
     const diary = await getOrCreateDiary(db, userId, dateKey);
 
     const history = await db
@@ -1055,13 +1223,176 @@ app.get('/api/debug/list-collections', async (_req, res) => {
   }
 });
 
+// ----------------------- # 실시간 1대1 매칭 -시작- -----------------------
+// 작성자: 송창하
+// socket.io(실시간 통신)와 http 서버를 위한 모듈 가져오기
+import { Server } from "socket.io";
+import http from "http";
+
+// 기존의 express 앱(app)을 http 서버로 감싸서 socket.io와 함께 사용 가능
+const httpServer = http.createServer(app);
+
+// socket.io 서버 생성
+// cors를 *로 설정시 모든 도메인에서 접속 가능
+const server = new Server(httpServer, { cors: { origin: "*" } });
+
+// waitingUser: 현재 매칭을 기다리고 있는 사용자
+let waitingUser: string | null = null;
+
+// 방 별 사용자 관리를 위한 Map
+const roomUsers = new Map<string, string[]>();
+
+// ------------------------- # connection -시작- -------------------------
+// 클라이언트 -> 서버 (connection)
+server.on("connection", (client) => {
+
+  // -log-
+  console.log(`새 사용자 접속: ${client.id}`);
+
+  // 클라이언트 -> 서버 (userDisconnect)
+  client.on("userDisconnect", () => {
+    // -log-
+    console.log(`사용자 접속 종료: ${client.id}`);
+    
+    // 매칭 대기 중이던 사용자가 접속을 종료한 경우
+    if (waitingUser === client.id) {
+
+      // 대기열 비우기
+      waitingUser = null;
+    }
+    
+  });
+
+  // ----------------- # startMatching -시작- -----------------
+  // 클라이언트 -> 서버 (startMatching)
+  client.on("startMatching", () => {
+
+    // -log-
+    console.log(`${client.id} 매칭 요청`)
+
+    // 이미 매칭 대기 중인 다른 클라이언트가 있을 때 (1/2명 -> 2/2명)
+    if (waitingUser) {
+
+      // roomId: 두 클라이언트가 들어갈 방 ID 값
+      const roomId = `${waitingUser}_${client.id}`;
+
+      // 두 클라이언트를 roomId방 안에 넣기
+      server.sockets.sockets.get(waitingUser)?.join(roomId);
+      client.join(roomId);
+
+      // 방 사용자 목록에 추가
+      roomUsers.set(roomId, [waitingUser, client.id]);
+
+      // (1번 이벤트 루프를 건너뛴 다음) 두 클라이언트에게 matched 이벤트 보내기 (1대1 채팅 매칭 성공)
+      setTimeout(() => {
+        server.to(roomId).emit("matched", { roomId, users: [waitingUser, client.id] });
+      }, 0)
+
+      // -log-
+      console.log(`매칭 완료: ${waitingUser} - ${client.id}`);
+
+      // 대기열 비우기
+      waitingUser = null;
+
+    }
+    // 매칭 대기 중인 다른 클라이언트가 없을 때 (0/2명 -> 1/2명)
+    else {
+
+      // 현재 클라이언트를 대기열에 등록
+      waitingUser = client.id;
+    }
+  })
+  // ----------------- # startMatching -끝- -----------------
+
+  // 클라이언트 -> 서버 (chat): 같은 방에 있는 사람에게 메시지 전달
+  client.on("chat", async ({ roomId, text }) => {
+
+    const openai = new OpenAI({ apiKey: OPENAI_API_KEY });
+
+    // OpenAI에게 메시지에 담긴 감정을 색상으로 변환해 달라고 하기
+    const airesponse = await openai.chat.completions.create({
+      model: "gpt-4.1-nano",
+      messages: [
+        {
+          role: "system",
+          content: `사용자가 입력한 문장의 감정을 파악하고 감정에 어울리는 색상을 {"color":"#ffffff"} 형태로 만들어`
+        },
+        {
+          role: "user",
+          content: text
+        }
+      ],
+      temperature: 0
+    });
+
+    // aiContent: openai의 답변
+    let aiContent = airesponse.choices[0].message.content;
+
+    // json: aicontent에 포함한 json
+    const jsonMatch = aiContent?.match(/\{[^}]+\}/);
+
+    // 채팅 말풍선 색상 기본값
+    let color = "#aaaaaa";
+
+    // 만약 AI 메시지에서 json이 포함되어 있다면
+    if (jsonMatch) {
+
+      // AI 메시지에서 json 추출 시도
+      const json = JSON.parse(jsonMatch[0]);
+
+      // json에 color 속성이 있을 때
+      if (json.color) {
+
+        // 채팅 말풍선 색상 변경
+        color = json.color;
+      }
+    }
+
+    console.log(color);
+
+    // 해당 room에 속한 모든 클라이언트에게 메시지 전송
+    server.to(roomId).emit("chat", { user: client.id, text, color });
+  }
+  );
+
+  // 클라이언트 -> 서버 (disconnect): 연결 종료
+  client.on("disconnect", () => {
+    // -log-
+    console.log(`연결 종료: ${client.id}`);
+
+    // 만약 대기열에 있던 클라이언트라면 대기열 비우기
+    if (client.id == waitingUser) {
+      waitingUser = null;
+    }
+
+    // 사용자가 속한 방을 찾아서 처리
+    for (const [roomId, users] of roomUsers.entries()) {
+      if (users.includes(client.id)) {
+        // 남은 사용자에게 상대방 연결 종료 알림
+        const otherUser = users.find(id => id !== client.id);
+        if (otherUser) {
+          server.to(otherUser).emit("userLeft", { 
+            message: "상대방이 대화방을 나갔습니다." 
+          });
+        }
+        // 방 목록에서 제거
+        roomUsers.delete(roomId);
+        break;
+      }
+    }
+  });
+
+});
+// ------------------------- # connection -끝- -------------------------
+// ----------------------- # 실시간 1대1 매칭 -끝- -----------------------
+
 // Start only after confirming DB readiness
 (async () => {
   try {
     const client = await getClient();
     await client.db('admin').command({ ping: 1 });
     await ensureIndexes();
-    app.listen(PORT, () => {
+    httpServer.listen(PORT, () => {
       console.log(`API server listening on http://localhost:${PORT} (db: ${DB_NAME})`);
     });
   } catch (e) {
