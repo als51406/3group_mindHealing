@@ -474,11 +474,11 @@ function loadUserEmotionColors(): Record<string, string> {
             const hex = v.startsWith('#') ? v : `#${v}`;
             if (/^#[0-9a-fA-F]{6}$/.test(hex)) {
               const HEX = hex.toUpperCase();
-              // 1) 원본 키도 보관 (디버그/미사용 키 조회용)
+              // 1) 원본 키만 보관 (emotion_colors.json의 키만 사용)
               out[k] = HEX;
               // 2) 표준 감정 키로 정규화한 항목을 생성하여 기본 팔레트를 덮어씌움
-              const canon = normalizeEmotionKey(k);
-              out[canon] = HEX;
+              // const canon = normalizeEmotionKey(k);
+              // out[canon] = HEX;
             }
           }
         }
@@ -496,6 +496,15 @@ const EMOTION_COLORS: Record<string, string> = {
   // ...BASE_EMOTION_COLORS,
   ...loadUserEmotionColors(),
 };
+
+// 감정 색상 매핑 출력
+console.log('📊 Emotion Colors Loaded:');
+console.log('═'.repeat(60));
+Object.entries(EMOTION_COLORS).forEach(([mood, color]) => {
+  console.log(`  ${mood.padEnd(20)} → ${color}`);
+});
+console.log('═'.repeat(60));
+console.log(`✅ Total emotions: ${Object.keys(EMOTION_COLORS).length}\n`);
 
 // Convert hex <-> HSL helpers (lightweight, for palette blending)
 function hexToRgb01(hex: string){
@@ -540,30 +549,42 @@ async function personalizedColorForEmotion(db: any, userId: string, baseColor: s
 }
 
 async function detectEmotionFromText(text: string): Promise<{ emotion: string; score: number; color: string }> {
-  // 간단 분류 프롬프트 (JSON 반환 기대)
+  // emotion_colors.json의 감정 키 목록 생성
+  const emotionKeys = Object.keys(EMOTION_COLORS);
+  const emotionList = emotionKeys.join(', ');
+  const defaultEmotion = emotionKeys[0] || '평온/안도';
+  
+  // 디버그: 분석할 텍스트의 마지막 200자 출력
+  const textPreview = text.length > 200 ? '...' + text.slice(-200) : text;
+  console.log('📝 감정 분석 텍스트:', textPreview);
+  
   const openai = new OpenAI({ apiKey: OPENAI_API_KEY });
-  const prompt = `다음 한국어 텍스트의 주된 감정을 다음 목록 중 하나로 분류하고 0~100 강도로 점수를 주세요. 반드시 JSON으로만 답하세요.
-감정 목록: joy, sad, anger, fear, anxious, neutral
-출력 형식: {"emotion":"joy|sad|anger|fear|anxious|neutral","score":0..100}
+  const prompt = `다음 한국어 텍스트에서 가장 마지막 문장의 감정을 분석하세요.
+감정 목록: ${emotionList}
+출력 형식: {"emotion":"<감정 키 중 하나>","score":0..100}
 텍스트: ${text}`;
   try {
     const resp = await openai.chat.completions.create({
       model: OPENAI_MODEL,
       messages: [
-        { role: 'system', content: 'You are a helpful assistant that returns JSON only.' },
+        { role: 'system', content: 'You are a helpful assistant that returns JSON only. 반드시 제공된 감정 목록 중 하나를 정확히 사용하세요. 텍스트의 마지막 문장의 감정만 분석하세요.' },
         { role: 'user', content: prompt },
       ],
-      temperature: 0,
+      temperature: 0.1,
     });
     const raw = resp.choices?.[0]?.message?.content || '{}';
+    console.log('🤖 OpenAI 응답:', raw);
     let parsed: any = {};
     try { parsed = JSON.parse(raw); } catch { parsed = {}; }
-    const emotion = (parsed.emotion || 'neutral').toLowerCase();
+    const emotion = String(parsed.emotion || defaultEmotion).trim();
     const score = Math.max(0, Math.min(100, Number(parsed.score) || 0));
-    const color = EMOTION_COLORS[emotion] || EMOTION_COLORS.neutral;
+    // emotion_colors.json에 정의된 키만 사용
+    const color = EMOTION_COLORS[emotion] || EMOTION_COLORS[defaultEmotion] || '#A8E6CF';
+    console.log('✅ 최종 감정 분석:', { emotion, score, color });
     return { emotion, score, color };
-  } catch {
-    return { emotion: 'neutral', score: 0, color: EMOTION_COLORS.neutral };
+  } catch (e) {
+    console.error('❌ 감정 분석 오류:', e);
+    return { emotion: defaultEmotion, score: 0, color: EMOTION_COLORS[defaultEmotion] || '#A8E6CF' };
   }
 }
 
@@ -860,11 +881,13 @@ app.post('/api/diary/session/:id/chat', authMiddleware, async (req: any, res) =>
     
     // AI가 색상을 제공했다면 즉시 사용
     if (extractedColor) {
-      const allUserMessages = history
+      // 최근 2개 메시지만 분석 (가장 최근 감정에 집중)
+      const recentUserMessages = history
         .filter((m: any) => m.role === 'user')
+        .slice(-2)
         .map((m: any) => m.content)
         .join(' ');
-      const mood = await detectEmotionFromText(allUserMessages);
+      const mood = await detectEmotionFromText(recentUserMessages);
       finalMood = { ...mood, color: extractedColor }; // AI가 준 색상 사용!
       console.log('✨ 최종 감정:', finalMood);
       
@@ -872,22 +895,30 @@ app.post('/api/diary/session/:id/chat', authMiddleware, async (req: any, res) =>
         { _id: session._id }, 
         { $set: { mood: finalMood, lastUpdatedAt: new Date() } }
       );
-    } else if (totalMessages >= minMessages && !session.mood) {
-      // AI가 색상을 안 줬고, 최소 메시지 이상이면 기존 로직 사용
-      const allUserMessages = history
+    } else if (totalMessages >= minMessages) {
+      // AI가 색상을 안 줬고, 최소 메시지 이상이면 매번 감정 분석 업데이트
+      // 최근 2개 메시지만 분석 (가장 최근 감정에 집중)
+      const recentUserMessages = history
         .filter((m: any) => m.role === 'user')
+        .slice(-2)
         .map((m: any) => m.content)
         .join(' ');
-      const mood = await detectEmotionFromText(allUserMessages);
+      const mood = await detectEmotionFromText(recentUserMessages);
       const personalizedColor = await personalizedColorForEmotion(db, userId, mood.color, mood.emotion);
       finalMood = { ...mood, color: personalizedColor };
+      
+      console.log('🔄 감정 업데이트:', {
+        emotion: finalMood.emotion,
+        color: finalMood.color,
+        score: finalMood.score
+      });
       
       await db.collection('diary_sessions').updateOne(
         { _id: session._id }, 
         { $set: { mood: finalMood, lastUpdatedAt: new Date() } }
       );
     } else {
-      // 분석 전이거나 이미 분석된 경우 타임스탬프만 업데이트
+      // 최소 메시지 미만인 경우 타임스탬프만 업데이트
       await db.collection('diary_sessions').updateOne(
         { _id: session._id }, 
         { $set: { lastUpdatedAt: new Date() } }
@@ -932,14 +963,15 @@ app.post('/api/diary/session/:id/analyze', authMiddleware, async (req: any, res)
       return res.status(400).json({ message: '최소 1턴(2개 메시지) 이상 대화가 필요합니다.' });
     }
     
-    // 전체 대화 내용을 하나의 텍스트로 결합
-    const allUserMessages = history
+    // 최근 2개 메시지만 분석 (가장 최근 감정에 집중)
+    const recentUserMessages = history
       .filter((m: any) => m.role === 'user')
+      .slice(-2)
       .map((m: any) => m.content)
       .join(' ');
     
-    // 전체 대화 흐름을 기반으로 감정 분석
-    const mood = await detectEmotionFromText(allUserMessages);
+    // 최근 대화를 기반으로 감정 분석
+    const mood = await detectEmotionFromText(recentUserMessages);
     const personalizedColor = await personalizedColorForEmotion(db, userId, mood.color, mood.emotion);
     const finalMood = { ...mood, color: personalizedColor };
     

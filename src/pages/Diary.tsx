@@ -2,8 +2,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
-import AuroraOrb from '../components/AuroraOrb';
-import EmotionOrbv1 from '../components/EmotionOrbv1';
+import EmotionOrbPremium from '../components/EmotionOrbPremium';
 import { useToast } from '../components/Toast';
 import { ChatLoadingSkeleton, DiaryListSkeleton } from '../components/Skeleton';
 import DiaryCalendar from '../components/DiaryCalendar';
@@ -748,7 +747,7 @@ export default function Diary() {
                                                                             style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'transparent', border: 'none', padding: 0, cursor: 'pointer', flex: 1, textAlign: 'left' }}
                                                                         >
                                                                             <div style={{ width: 12, height: 12, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                                                                <AuroraOrb color={item.mood?.color || '#bdbdbd'} size={12} className="no-anim" />
+                                                                                <EmotionOrbPremium color={item.mood?.color || '#bdbdbd'} size={12} className="no-anim" />
                                                                             </div>
                                                                             <div style={{ 
                                                                                 fontWeight: 600, 
@@ -898,10 +897,10 @@ export default function Diary() {
                     // AI 대화 탭 - 기존 UI 유지
                     <div style={{ ...bgStyle, border: '1px solid #e5e7eb', borderRadius: 12, minHeight: '70vh', padding: 12, position: 'relative', boxSizing: 'border-box' }}>
                         {/* 감정 오브: 채팅창 왼쪽 상단 고정, 크게 */}
-                        <div className="aurora-breathe" style={{ position: 'absolute', top: -2, left: -8, zIndex: 1, pointerEvents: 'none', width: 200, height: 200, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                            <EmotionOrbv1 
+                        <div className="aurora-breathe" style={{ position: 'absolute', top: 0, left: -1, zIndex: 1, pointerEvents: 'none', width: 200, height: 200, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <EmotionOrbPremium 
                                 color={emotionOrbColor} 
-                                size={150}
+                                size={200}
                                 intensity={0.85}
                             />
                             {/* 디버깅 정보 */}
@@ -1132,7 +1131,7 @@ export default function Diary() {
                             {/* 오로라: 좌상단 */}
                             <div className="aurora-breathe" style={{ 
                                 position: 'absolute', 
-                                top: -16, 
+                                top: -40, 
                                 left: -16, 
                                 zIndex: 1, 
                                 pointerEvents: 'none', 
@@ -1142,7 +1141,7 @@ export default function Diary() {
                                 alignItems: 'center', 
                                 justifyContent: 'center' 
                             }}>
-                                <EmotionOrbv1 color={onlineOrbColor} size={100} intensity={0.7} />
+                                <EmotionOrbPremium color={onlineOrbColor} size={100} intensity={0.7} />
                             </div>
                             
                             <div style={{ marginBottom: 12, paddingTop: 12 }}>

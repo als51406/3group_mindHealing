@@ -204,11 +204,11 @@ const LiquidCore = memo(function LiquidCore({ color }: { color: string }) {
     const t = clock.getElapsedTime();
     
     // More dynamic floating animation
-    if (groupRef.current) {
-      groupRef.current.position.y = Math.sin(t * 0.6) * 0.1 + Math.sin(t * 0.4) * 0.05;
-      groupRef.current.rotation.y += 0.002; // 조금 더 빠르게 Y축 회전
-      groupRef.current.rotation.z = Math.sin(t * 0.5) * 0.05;
-    }
+    // if (groupRef.current) {
+    //   groupRef.current.position.y = Math.sin(t * 0.6) * 0.1 + Math.sin(t * 0.4) * 0.05;
+    //   groupRef.current.rotation.y += 0.002; // 조금 더 빠르게 Y축 회전
+    //   groupRef.current.rotation.z = Math.sin(t * 0.5) * 0.05;
+    // }
     
     // Much faster organic rotation for dynamic aurora flow
     if (coreRef.current) {
