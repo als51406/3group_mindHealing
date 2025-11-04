@@ -23,7 +23,8 @@ export default function Home() {
         if (!text) return;
         
         // 입력한 텍스트를 state로 전달하면서 /chat 으로 이동
-        navigate('/chat', { state: { initialMessage: text } });
+        // isNewChat 플래그를 추가하여 새 대화임을 명시
+        navigate('/chat', { state: { initialMessage: text, isNewChat: true } });
     }
 
     return (

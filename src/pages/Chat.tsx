@@ -44,6 +44,15 @@ export default function Chat() {
     useEffect(() => {
         (async () => {
             try {
+                // Home에서 새 대화로 넘어온 경우 (initialMessage가 있으면) 이전 기록 불러오지 않음
+                const state = location.state as { initialMessage?: string; isNewChat?: boolean } | null;
+                const isNewChat = state?.isNewChat || !!state?.initialMessage;
+                
+                if (isNewChat) {
+                    // 새 대화이므로 이전 기록을 불러오지 않음
+                    return;
+                }
+                
                 // 서버에서 이전 대화 기록 요청
                 const res = await fetch('/api/ai/history', { credentials: 'include' });
                 if (!res.ok) return; // 실패 시 무시
@@ -62,7 +71,7 @@ export default function Chat() {
                 // 실패 시 조용히 무시 (에러 메시지 노출 안 함)
             }
         })();
-    }, []); // 마운트 시 한 번만 실행
+    }, [location.state]); // location.state 의존성 추가
 
     // 컴포넌트 언마운트 시(또는 재렌더에 의해 cleanup이 필요할 때) 바디와 네비게이션 배경을 복원
     useEffect(() => {
