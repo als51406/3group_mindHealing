@@ -94,7 +94,7 @@ const liquidGradientFragmentShader = `
     float fresnel = pow(1.0 - max(dot(normal, viewDir), 0.0), 2.8);
     
     // Much faster and irregular organic movement
-    float t = uTime * 0.62;
+    float t = uTime * 0.30;
     
     // 오로라 커튼 효과 - 불규칙적이고 빠른 움직임
     // Y축은 크게, X/Z축은 작게 + 각기 다른 속도
@@ -178,6 +178,16 @@ const LiquidCore = memo(function LiquidCore({ color }: { color: string }) {
   const groupRef = useRef<THREE.Group>(null);
   const coreRef = useRef<THREE.Mesh>(null);
   const materialRef = useRef<THREE.ShaderMaterial>(null);
+  const glowRef = useRef<THREE.Mesh>(null);
+  const outerGlowRef = useRef<THREE.Mesh>(null);
+  const haloRef = useRef<THREE.Mesh>(null);
+  
+  // 색상 전환을 위한 target colors
+  const targetColorsRef = useRef<{
+    color1: THREE.Color;
+    color2: THREE.Color;
+    color3: THREE.Color;
+  } | null>(null);
 
   // 순수한 기본 색상만 사용 (색상 혼합 제거)
   const colors = useMemo(() => {
@@ -211,30 +221,61 @@ const LiquidCore = memo(function LiquidCore({ color }: { color: string }) {
     // Update time uniform - 항상 업데이트
     if (materialRef.current) {
       materialRef.current.uniforms.uTime.value = t;
+      
+      // 부드러운 색상 전환 (lerp) - 약 0.4초에 걸쳐 전환
+      if (targetColorsRef.current) {
+        const lerpSpeed = 0.08; // 프레임당 8% 씩 전환 (60fps 기준 약 0.4초)
+        
+        materialRef.current.uniforms.uColor1.value.lerp(targetColorsRef.current.color1, lerpSpeed);
+        materialRef.current.uniforms.uColor2.value.lerp(targetColorsRef.current.color2, lerpSpeed);
+        materialRef.current.uniforms.uColor3.value.lerp(targetColorsRef.current.color3, lerpSpeed);
+        
+        // Inner glow layer도 부드럽게 전환
+        if (glowRef.current) {
+          const glowMaterial = glowRef.current.material as THREE.MeshBasicMaterial;
+          glowMaterial.color.lerp(targetColorsRef.current.color2, lerpSpeed);
+        }
+        
+        // Outer glow aura도 부드럽게 전환
+        if (outerGlowRef.current) {
+          const outerMaterial = outerGlowRef.current.material as THREE.MeshBasicMaterial;
+          outerMaterial.color.lerp(targetColorsRef.current.color1, lerpSpeed);
+        }
+        
+        // Subtle color halo도 부드럽게 전환
+        if (haloRef.current) {
+          const haloMaterial = haloRef.current.material as THREE.MeshBasicMaterial;
+          haloMaterial.color.lerp(targetColorsRef.current.color2, lerpSpeed);
+        }
+      }
     }
   });
   
-  // 색상 변경 시에만 uniform 업데이트 (별도 useEffect)
+  // 색상 변경 시 target 업데이트 (즉시 적용하지 않고 useFrame에서 lerp)
   useEffect(() => {
-    if (materialRef.current) {
+    targetColorsRef.current = {
+      color1: colors.color1.clone(),
+      color2: colors.color2.clone(),
+      color3: colors.color3.clone(),
+    };
+    
+    // 첫 렌더링 시에만 즉시 적용
+    if (materialRef.current && !materialRef.current.uniforms.uColor1.value.equals(new THREE.Color(0, 0, 0))) {
+      if (import.meta.env.DEV) {
+        console.log('🎨 Target colors updated for smooth transition');
+      }
+    } else if (materialRef.current) {
+      // 첫 렌더링: 즉시 적용
       materialRef.current.uniforms.uColor1.value.copy(colors.color1);
       materialRef.current.uniforms.uColor2.value.copy(colors.color2);
       materialRef.current.uniforms.uColor3.value.copy(colors.color3);
-      
-      if (import.meta.env.DEV) {
-        console.log('🎨 Updated shader uniforms:', {
-          color1: colors.color1,
-          color2: colors.color2,
-          color3: colors.color3
-        });
-      }
     }
   }, [colors]);
 
   return (
     <group ref={groupRef}>
       {/* Inner glow layer */}
-      <mesh scale={0.86}>
+      <mesh ref={glowRef} scale={0.86}>
         <sphereGeometry args={[1, 64, 64]} />
         <meshBasicMaterial
           color={colors.color2}
@@ -287,7 +328,7 @@ const LiquidCore = memo(function LiquidCore({ color }: { color: string }) {
       </mesh>
 
       {/* Outer soft glow aura */}
-      <mesh scale={1.05}>
+      <mesh ref={outerGlowRef} scale={1.05}>
         <sphereGeometry args={[1, 64, 64]} />
         <meshBasicMaterial
           transparent
@@ -299,7 +340,7 @@ const LiquidCore = memo(function LiquidCore({ color }: { color: string }) {
       </mesh>
 
       {/* Subtle color halo */}
-      <mesh scale={1.09}>
+      <mesh ref={haloRef} scale={1.09}>
         <sphereGeometry args={[1, 48, 48]} />
         <meshBasicMaterial
           transparent
@@ -424,8 +465,18 @@ const EmotionOrbPremium = memo(function EmotionOrbPremium({
             powerPreference: 'high-performance',
             toneMapping: THREE.ACESFilmicToneMapping,
             toneMappingExposure: 1.0,
+            failIfMajorPerformanceCaveat: false,
+            preserveDrawingBuffer: true,
           }}
           style={{ display: 'block' }}
+          onCreated={({ gl }) => {
+            // WebGL 컨텍스트 손실 확장 지원 확인 (경고 방지)
+            const context = gl.getContext() as WebGLRenderingContext;
+            const loseContext = context?.getExtension('WEBGL_lose_context');
+            if (!loseContext && import.meta.env.DEV) {
+              console.log('ℹ️ WEBGL_lose_context 확장이 지원되지 않습니다 (정상 동작)');
+            }
+          }}
         >
           {/* Soft ambient fill light */}
           <ambientLight intensity={0.45 * intensity} color="#f9faff" />

@@ -84,6 +84,8 @@ export default function Diary() {
     const [searchQuery, setSearchQuery] = useState<string>(''); // 검색어
     const [pendingOnlineSessionId, setPendingOnlineSessionId] = useState<string | null>(null); // 온라인 채팅 저장 후 자동 선택할 세션 ID
     const [showWelcomeMessage, setShowWelcomeMessage] = useState<boolean>(false); // 환영 메시지 표시 여부
+    const [summary, setSummary] = useState<string>(''); // 대화 요약
+    const [isSummarizing, setIsSummarizing] = useState<boolean>(false); // 요약 중 상태
     const bottomRef = useRef<HTMLDivElement | null>(null);
     const textareaRef = useRef<HTMLTextAreaElement | null>(null); // textarea 참조
 
@@ -119,22 +121,30 @@ export default function Diary() {
         } as React.CSSProperties;
     }, [mood]);
 
-    // EmotionOrb 색상
+    // EmotionOrb 색상 (의존성 통일 및 강제 리렌더링)
     const emotionOrbColor = useMemo(() => {
         const color = mood?.color || '#6366f1';
-        if (import.meta.env.DEV && mood?.color) {
-            console.log('🎨 EmotionOrb color:', color, 'from mood:', mood);
+        if (import.meta.env.DEV) {
+            console.log('🎨 AI EmotionOrb color update:', { 
+                color, 
+                emotion: mood?.emotion, 
+                hasColor: !!mood?.color 
+            });
         }
         return color;
-    }, [mood]);
+    }, [mood?.color, mood?.emotion]); // color와 emotion 둘 다 의존
 
     const onlineOrbColor = useMemo(() => {
         const color = mood?.color || '#6366f1';
-        if (import.meta.env.DEV && mood?.color) {
-            console.log('🎨 OnlineOrb color:', color);
+        if (import.meta.env.DEV) {
+            console.log('🎨 Online EmotionOrb color update:', { 
+                color, 
+                emotion: mood?.emotion, 
+                hasColor: !!mood?.color 
+            });
         }
         return color;
-    }, [mood?.color]);
+    }, [mood?.color, mood?.emotion]); // color와 emotion 둘 다 의존
     
     // 감정 분석 대기 중 상태 (5개 미만 메시지 && 감정 미분석) - 채팅 전부터 색상 순환
     const isWaitingAnalysis = useMemo(() => {
@@ -266,7 +276,7 @@ export default function Diary() {
                     const data: DiarySessionDetailApiResponse = await res.json();
             // DEV 환경 디버깅
             if (import.meta.env.DEV) {
-                console.log('📂 Load Session:', { sessionId, mood: data?.session?.mood });
+                console.log('📂 Load Session:', { sessionId, mood: data?.session?.mood, summary: data?.session?.summary });
             }
             const msgs: DiaryMessage[] = Array.isArray(data?.messages)
                         ? data.messages.map((m) => ({ id: m.id, role: m.role, content: m.content, createdAt: m.createdAt }))
@@ -275,6 +285,13 @@ export default function Diary() {
             const sessionType = (data?.session?.type || 'ai') as 'ai' | 'online';
             const originalMessageCount = data?.session?.originalMessageCount || 0;
             setCurrentSessionType(sessionType);
+            
+            // 요약 로드 (온라인 채팅 세션만)
+            if (sessionType === 'online') {
+                setSummary(data?.session?.summary || '');
+            } else {
+                setSummary('');
+            }
             
             // DEV 환경 디버깅
             if (import.meta.env.DEV) {
@@ -410,12 +427,19 @@ export default function Diary() {
 
     // 온라인 채팅에서 저장 후 이동 시 처리
     useEffect(() => {
-        const state = location.state as { activeTab?: 'ai' | 'online'; sessionId?: string; date?: string } | null;
+        const state = location.state as { 
+            activeTab?: 'ai' | 'online'; 
+            sessionId?: string; 
+            date?: string; 
+            autoSummarize?: boolean 
+        } | null;
+        
         if (state?.activeTab === 'online' && state?.sessionId) {
             if (import.meta.env.DEV) {
                 console.log('🔵 Online chat saved, navigating to diary:', {
                     sessionId: state.sessionId,
-                    date: state.date
+                    date: state.date,
+                    autoSummarize: state.autoSummarize
                 });
             }
             
@@ -428,6 +452,14 @@ export default function Diary() {
             // pending 세션 ID 설정 (onlineList 업데이트 후 자동 선택됨)
             setPendingOnlineSessionId(state.sessionId);
             
+            // 자동 요약 플래그가 있으면 요약 시작
+            if (state.autoSummarize && state.sessionId) {
+                // 세션 로딩 후 요약 실행 (약간의 지연)
+                setTimeout(() => {
+                    void summarizeConversation(state.sessionId!);
+                }, 1000);
+            }
+            
             // 목록 새로고침
             void refreshList();
             
@@ -436,6 +468,35 @@ export default function Diary() {
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [location.state]);
+    
+    // 탭 전환 또는 세션 선택 시 mood 업데이트 (오브 색상 동기화)
+    // 깜빡임 방지: mood가 없을 때도 이전 색상 유지
+    useEffect(() => {
+        if (!selected) {
+            if (import.meta.env.DEV) console.log('🔄 No session selected, keeping previous mood');
+            // mood를 null로 설정하지 않고 이전 값 유지 (깜빡임 방지)
+            return;
+        }
+        
+        // 현재 탭에 맞는 목록에서 선택된 세션 찾기
+        const currentList = activeTab === 'ai' ? list : onlineList;
+        const currentSession = currentList.find(s => s._id === selected);
+        
+        if (currentSession?.mood) {
+            if (import.meta.env.DEV) {
+                console.log('🔄 Tab/Session changed, updating mood for orb:', {
+                    tab: activeTab,
+                    sessionId: selected,
+                    emotion: currentSession.mood.emotion,
+                    color: currentSession.mood.color
+                });
+            }
+            setMood(currentSession.mood);
+        } else {
+            // mood가 없어도 이전 색상 유지 (깜빡임 방지)
+            if (import.meta.env.DEV) console.log('🔄 Session has no mood, keeping previous color');
+        }
+    }, [activeTab, selected, list, onlineList]);
     
     // onlineList 업데이트 시 pending 세션 자동 선택
     useEffect(() => {
@@ -635,6 +696,58 @@ export default function Diary() {
             });
         } finally {
             setIsAnalyzing(false);
+        }
+    };
+
+    // 대화 요약 함수
+    const summarizeConversation = async (sessionId: string) => {
+        if (isSummarizing) return;
+        
+        setIsSummarizing(true);
+        showToast({ 
+            message: '💭 AI가 대화 내용을 분석하고 있습니다...', 
+            type: 'info',
+            duration: 2000
+        });
+        
+        try {
+            const res = await fetch(`/api/diary/session/${sessionId}/summarize`, {
+                method: 'POST',
+                credentials: 'include',
+            });
+            
+            if (!res.ok) {
+                const error = await res.json();
+                showToast({ 
+                    message: error.message || '요약에 실패했습니다.', 
+                    type: 'error',
+                    duration: 3000
+                });
+                return;
+            }
+            
+            const data = await res.json();
+            if (import.meta.env.DEV) {
+                console.log('📝 Summary:', data?.summary);
+            }
+            
+            setSummary(data?.summary || '');
+            
+            showToast({ 
+                message: '✅ 대화 요약이 완료되었습니다!', 
+                type: 'success',
+                duration: 3000
+            });
+            
+        } catch (error) {
+            console.error('요약 에러:', error);
+            showToast({ 
+                message: '네트워크 오류가 발생했습니다.', 
+                type: 'error',
+                duration: 3000
+            });
+        } finally {
+            setIsSummarizing(false);
         }
     };
 
@@ -1415,6 +1528,64 @@ export default function Diary() {
                                 )}
                             </div>
                         </div>
+
+                        {/* 중간: AI 요약 섹션 */}
+                        {(summary || isSummarizing) && (
+                            <div style={{ 
+                                flexShrink: 0,
+                                border: '2px solid #10b981', 
+                                borderRadius: 12, 
+                                padding: 16, 
+                                background: 'linear-gradient(135deg, rgba(236,253,245,0.98) 0%, rgba(209,250,229,0.98) 100%)',
+                                boxShadow: '0 2px 8px rgba(16,185,129,0.15)'
+                            }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+                                    <span style={{ fontSize: 20 }}>📝</span>
+                                    <span style={{ fontSize: 16, fontWeight: 700, color: '#065f46' }}>
+                                        대화 요약
+                                    </span>
+                                    {isSummarizing && (
+                                        <span style={{ fontSize: 13, color: '#059669', marginLeft: 'auto' }}>
+                                            분석 중...
+                                        </span>
+                                    )}
+                                </div>
+                                {isSummarizing ? (
+                                    <div style={{ 
+                                        display: 'flex', 
+                                        alignItems: 'center', 
+                                        gap: 12,
+                                        padding: '20px 0',
+                                        justifyContent: 'center'
+                                    }}>
+                                        <div className="loading-spinner" style={{
+                                            width: 24,
+                                            height: 24,
+                                            border: '3px solid #d1fae5',
+                                            borderTop: '3px solid #10b981',
+                                            borderRadius: '50%',
+                                            animation: 'spin 1s linear infinite'
+                                        }} />
+                                        <span style={{ fontSize: 14, color: '#065f46' }}>
+                                            AI가 대화 내용을 분석하고 있습니다...
+                                        </span>
+                                    </div>
+                                ) : (
+                                    <div style={{ 
+                                        fontSize: 14, 
+                                        lineHeight: 1.8, 
+                                        color: '#047857',
+                                        whiteSpace: 'pre-wrap',
+                                        background: 'rgba(255,255,255,0.5)',
+                                        padding: 12,
+                                        borderRadius: 8,
+                                        border: '1px solid #a7f3d0'
+                                    }}>
+                                        {summary}
+                                    </div>
+                                )}
+                            </div>
+                        )}
 
                         {/* 하단: AI와 대화 */}
                         <div style={{ 

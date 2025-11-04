@@ -220,17 +220,15 @@ export default function Online() {
         duration: 3500 
       });
       
-      // 다이어리 페이지로 이동 여부 묻기
-      const goToDiary = confirm('다이어리 페이지로 이동하시겠습니까?');
-      if (goToDiary) {
-        navigate('/diary', { 
-          state: { 
-            activeTab: 'online', 
-            sessionId: sessionId,
-            date: dateKey
-          } 
-        });
-      }
+      // 다이어리 페이지로 이동하면서 자동으로 요약 시작
+      navigate('/diary', { 
+        state: { 
+          activeTab: 'online', 
+          sessionId: sessionId,
+          date: dateKey,
+          autoSummarize: true // 자동 요약 플래그
+        } 
+      });
       
     } catch (error) {
       console.error('❌ 다이어리 저장 에러:', error);

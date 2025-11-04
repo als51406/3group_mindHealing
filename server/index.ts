@@ -642,18 +642,33 @@ async function detectEmotionFromText(text: string): Promise<{ emotion: string; s
   console.log('📝 감정 분석 텍스트:', textPreview);
   
   const openai = new OpenAI({ apiKey: OPENAI_API_KEY });
-  const prompt = `다음 한국어 텍스트에서 가장 마지막 문장의 감정을 분석하세요.
+  const prompt = `다음 한국어 텍스트에서 사용자의 전반적인 감정 상태를 분석하세요.
+여러 메시지가 포함되어 있다면, 가장 최근 메시지에 더 높은 가중치를 두되 전체적인 맥락도 고려하세요.
+
 감정 목록: ${emotionList}
+
 출력 형식: {"emotion":"<감정 키 중 하나>","score":0..100}
+- emotion: 위 목록에서 정확히 하나를 선택
+- score: 해당 감정의 확신도 (0~100, 높을수록 확실함)
+
 텍스트: ${text}`;
+
   try {
     const resp = await openai.chat.completions.create({
       model: OPENAI_MODEL,
       messages: [
-        { role: 'system', content: 'You are a helpful assistant that returns JSON only. 반드시 제공된 감정 목록 중 하나를 정확히 사용하세요. 텍스트의 마지막 문장의 감정만 분석하세요.' },
+        { 
+          role: 'system', 
+          content: `You are an expert emotion analyzer that returns JSON only.
+규칙:
+1. 반드시 제공된 감정 목록 중 하나를 정확히 사용
+2. 최근 메시지일수록 중요하게 고려
+3. 일관성 있는 분석 (같은 텍스트는 항상 같은 결과)
+4. score는 감정의 명확성과 강도를 반영 (애매하면 낮게, 명확하면 높게)`
+        },
         { role: 'user', content: prompt },
       ],
-      temperature: 0.1,
+      temperature: 0.1, // 낮은 temperature로 일관성 향상
     });
     const raw = resp.choices?.[0]?.message?.content || '{}';
     console.log('🤖 OpenAI 응답:', raw);
@@ -992,11 +1007,17 @@ app.post('/api/diary/session/:id/chat', authMiddleware, async (req: any, res) =>
     
     // 사용자 메시지가 5개 이상일 때만 감정 분석
     if (userMessageCount >= minMessages) {
-      // 최근 2개 사용자 메시지만 분석 (가장 최근 감정에 집중)
+      // 최근 5개 사용자 메시지만 분석 (Chat.tsx와 일관성 유지)
       const recentUserMessages = [...userMessages, { content: text }]
-        .slice(-2)
+        .slice(-5)
         .map((m: any) => m.content)
         .join(' ');
+      
+      console.log('📝 Diary 세션 감정 분석:', {
+        totalMessages: userMessageCount,
+        analyzingCount: Math.min(5, userMessageCount),
+        textPreview: recentUserMessages.slice(-100)
+      });
       
       const mood = await detectEmotionFromText(recentUserMessages);
       
@@ -1056,12 +1077,18 @@ app.post('/api/diary/session/:id/analyze', authMiddleware, async (req: any, res)
       return res.status(400).json({ message: '최소 1턴(2개 메시지) 이상 대화가 필요합니다.' });
     }
     
-    // 최근 2개 메시지만 분석 (가장 최근 감정에 집중)
-    const recentUserMessages = history
-      .filter((m: any) => m.role === 'user')
-      .slice(-2)
+    // 최근 5개 사용자 메시지만 분석 (일관성 유지)
+    const userMessages = history.filter((m: any) => m.role === 'user');
+    const recentUserMessages = userMessages
+      .slice(-5)
       .map((m: any) => m.content)
       .join(' ');
+    
+    console.log('📝 수동 감정 분석:', {
+      totalMessages: userMessages.length,
+      analyzingCount: Math.min(5, userMessages.length),
+      textPreview: recentUserMessages.slice(-100)
+    });
     
     // 최근 대화를 기반으로 감정 분석
     const mood = await detectEmotionFromText(recentUserMessages);
@@ -1073,10 +1100,12 @@ app.post('/api/diary/session/:id/analyze', authMiddleware, async (req: any, res)
       { $set: { mood: finalMood, lastUpdatedAt: new Date() } }
     );
     
+    console.log('✅ 수동 분석 완료:', finalMood);
+    
     res.status(200).json({ 
       ok: true, 
       mood: finalMood,
-      messageCount: history.length
+      messageCount: userMessages.length
     });
   } catch (e: any) {
     console.error('manual analyze error:', e?.message || e);
@@ -1191,6 +1220,78 @@ app.post('/api/diary/session/:id/import', authMiddleware, async (req: any, res) 
   } catch (e: any) {
     console.error('import error:', e?.message || e);
     res.status(500).json({ message: '메시지 가져오기 오류' });
+  }
+});
+
+// POST /api/diary/session/:id/summarize - 대화 내용 요약
+app.post('/api/diary/session/:id/summarize', authMiddleware, async (req: any, res) => {
+  try {
+    if (!OPENAI_API_KEY) return res.status(500).json({ message: 'OPENAI_API_KEY 미설정' });
+    const id = String(req.params.id || '').trim();
+    if (!ObjectId.isValid(id)) return res.status(400).json({ message: '유효하지 않은 ID' });
+    
+    const client = await getClient();
+    const db = client.db(DB_NAME);
+    const userId = req.user.sub;
+    
+    // 세션 확인
+    const session = await db.collection('diary_sessions').findOne({ _id: new ObjectId(id), userId });
+    if (!session) return res.status(404).json({ message: '세션을 찾을 수 없습니다.' });
+    
+    // 이미 요약이 있으면 반환
+    if (session.summary) {
+      return res.status(200).json({ ok: true, summary: session.summary });
+    }
+    
+    // 모든 메시지 가져오기
+    const messages = await db.collection('diary_session_messages')
+      .find({ sessionId: new ObjectId(id), userId })
+      .sort({ createdAt: 1 })
+      .toArray();
+    
+    if (messages.length === 0) {
+      return res.status(400).json({ message: '요약할 메시지가 없습니다.' });
+    }
+    
+    // 대화 내용을 텍스트로 변환
+    const conversationText = messages
+      .map((m: any) => `${m.role === 'user' ? '사용자' : '상대방'}: ${m.content}`)
+      .join('\n');
+    
+    // AI에게 요약 요청
+    const openai = new OpenAI({ apiKey: OPENAI_API_KEY });
+    const summaryMessages = [
+      {
+        role: 'system',
+        content: `당신은 대화 내용을 요약하는 전문가입니다. 
+주어진 대화를 읽고 다음 사항을 포함하여 3-5문장으로 요약해주세요:
+1. 대화의 주요 주제와 내용
+2. 사용자가 표현한 감정이나 고민
+3. 대화의 주요 흐름이나 결론
+
+자연스럽고 공감적인 톤으로 작성하되, 핵심만 간결하게 전달해주세요.`
+      },
+      {
+        role: 'user',
+        content: `다음 대화를 요약해주세요:\n\n${conversationText}`
+      }
+    ];
+    
+    const completion = await chatCompletionWithFallback(openai, summaryMessages);
+    const summary = completion.choices?.[0]?.message?.content || '요약을 생성할 수 없습니다.';
+    
+    // 요약 저장
+    await db.collection('diary_sessions').updateOne(
+      { _id: new ObjectId(id) },
+      { $set: { summary, lastUpdatedAt: new Date() } }
+    );
+    
+    console.log('✅ 대화 요약 완료:', summary);
+    
+    res.status(200).json({ ok: true, summary });
+  } catch (e: any) {
+    console.error('summarize error:', e?.message || e);
+    res.status(500).json({ message: '요약 생성 오류' });
   }
 });
 

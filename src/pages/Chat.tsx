@@ -351,8 +351,15 @@ export default function Chat() {
                 return;
             }
             
-            // 전체 대화 텍스트 생성
-            const allText = userMessages.map(m => m.content).join(' ');
+            // 최근 5개 메시지만 사용 (일관성 유지)
+            const recentMessages = userMessages.slice(-5);
+            const allText = recentMessages.map(m => m.content).join(' ');
+            
+            console.log('📝 Chat.tsx 감정 분석:', {
+                totalMessages: userMessages.length,
+                analyzingCount: recentMessages.length,
+                textPreview: allText.slice(-100)
+            });
             
             // 감정 분석 API 호출
             const res = await fetch('/api/ai/analyze-emotion', {
@@ -372,6 +379,7 @@ export default function Chat() {
             if (analyzedMood && analyzedMood.emotion && analyzedMood.color) {
                 setMood(analyzedMood);
                 setEmotionColor(analyzedMood.color); // 배경 그라데이션 색상 업데이트
+                console.log('✅ Chat.tsx 감정 분석 완료:', analyzedMood);
                 showToast({ 
                     message: `✨ 감정 분석 완료! ${analyzedMood.emotion} (${Math.round(analyzedMood.score * 100)}%)`, 
                     type: 'success', 
