@@ -2,7 +2,7 @@
 
 .emotion-orb-premium-wrapper {
   position: relative;
-  display: inline-block;
+  display: block;
   user-select: none;
   -webkit-user-select: none;
 }
@@ -54,7 +54,11 @@
 
 /* Smooth entrance animation */
 .emotion-orb-premium-wrapper {
-  animation: orb-fade-in 0.8s ease-out;
+  /* animation: orb-fade-in 0.8s ease-out forwards; */
+  /* animation-iteration-count: 1; */
+  transform-origin: center center;
+  opacity: 1;
+  transform: scale(1);
 }
 
 @keyframes orb-fade-in {

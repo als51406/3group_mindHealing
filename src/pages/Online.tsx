@@ -202,7 +202,13 @@ export default function Online() {
       // 다이어리 페이지로 이동 여부 묻기
       const goToDiary = confirm('다이어리 페이지로 이동하시겠습니까?');
       if (goToDiary) {
-        navigate('/diary');
+        navigate('/diary', { 
+          state: { 
+            activeTab: 'online', 
+            sessionId: sessionId,
+            date: dateKey
+          } 
+        });
       }
       
     } catch (error) {

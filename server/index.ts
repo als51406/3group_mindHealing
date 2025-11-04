@@ -835,7 +835,24 @@ app.get('/api/diary/session/:id', authMiddleware, async (req: any, res) => {
       .find({ sessionId: session._id })
       .sort({ createdAt: 1 })
       .toArray();
-    res.json({ ok: true, session: { id: String(session._id), date: session.date, title: session.title || '', mood: session.mood || null, lastUpdatedAt: session.lastUpdatedAt }, messages: msgs.map(m => ({ id: String(m._id), role: m.role, content: m.content, createdAt: m.createdAt })) });
+    
+    // 온라인 채팅 세션인데 originalMessageCount가 없으면 자동 설정
+    let originalCount = session.originalMessageCount || 0;
+    if (session.type === 'online' && !session.originalMessageCount && msgs.length > 0) {
+      // 자동요약 메시지를 찾아서 그 전까지를 원본으로 처리
+      const summaryIndex = msgs.findIndex((m: any) => 
+        m.role === 'user' && m.content && m.content.startsWith('[자동요약]')
+      );
+      originalCount = summaryIndex >= 0 ? summaryIndex : msgs.length;
+      
+      // DB 업데이트
+      await db.collection('diary_sessions').updateOne(
+        { _id: session._id },
+        { $set: { originalMessageCount: originalCount } }
+      );
+    }
+    
+    res.json({ ok: true, session: { id: String(session._id), date: session.date, title: session.title || '', type: session.type || 'ai', mood: session.mood || null, originalMessageCount: originalCount, lastUpdatedAt: session.lastUpdatedAt }, messages: msgs.map(m => ({ id: String(m._id), role: m.role, content: m.content, createdAt: m.createdAt })) });
   } catch (e) {
     res.status(500).json({ message: '세션 조회 오류' });
   }
@@ -1075,6 +1092,14 @@ app.post('/api/diary/session/:id/import', authMiddleware, async (req: any, res) 
     if (docs.length === 0) return res.status(400).json({ message: '유효한 메시지가 없습니다.' });
     
     await db.collection('diary_session_messages').insertMany(docs);
+    
+    // 온라인 채팅 세션인 경우, 원본 메시지 개수 저장
+    if (session.type === 'online') {
+      await db.collection('diary_sessions').updateOne(
+        { _id: session._id },
+        { $set: { originalMessageCount: docs.length } }
+      );
+    }
     
     // 마지막 사용자 메시지로 감정 분석
     const lastUserMsg = messages.filter((m: any) => m.role === 'user').slice(-1)[0];

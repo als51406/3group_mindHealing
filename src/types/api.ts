@@ -6,6 +6,7 @@ export interface DiarySessionResponse {
   title?: string;
   type?: 'ai' | 'online'; // 세션 타입
   mood?: { emotion: string; score: number; color: string } | null;
+  originalMessageCount?: number; // 온라인 채팅의 원본 메시지 개수
   lastUpdatedAt: string;
   preview?: string;
 }

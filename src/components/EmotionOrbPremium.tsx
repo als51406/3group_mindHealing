@@ -331,7 +331,7 @@ const EmotionOrbPremium = memo(function EmotionOrbPremium({
       style={{
         width: size,
         height: size,
-        display: 'inline-block',
+        display: 'block',
         position: 'relative',
       }}
     >
@@ -367,6 +367,7 @@ const EmotionOrbPremium = memo(function EmotionOrbPremium({
             toneMapping: THREE.ACESFilmicToneMapping,
             toneMappingExposure: 1.0,
           }}
+          style={{ display: 'block' }}
         >
           {/* Soft ambient fill light */}
           <ambientLight intensity={0.45 * intensity} color="#f9faff" />

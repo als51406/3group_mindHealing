@@ -1,6 +1,6 @@
 // Diary.tsx — 날짜별 다이어리 + AI 대화 저장/조회
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import EmotionOrbPremium from '../components/EmotionOrbPremium';
 import { useToast } from '../components/Toast';
@@ -48,6 +48,7 @@ function highlightText(text: string, query: string) {
 
 export default function Diary() {
     const navigate = useNavigate();
+    const location = useLocation();
     const { user, loading } = useAuth();
     const { showToast, ToastContainer } = useToast();
 
@@ -59,6 +60,9 @@ export default function Diary() {
     const [selected, setSelected] = useState<string>(''); // 선택된 세션 ID
     const [selectedDate, setSelectedDate] = useState<string>(todayKey());
     const [messages, setMessages] = useState<DiaryMessage[]>([]);
+    const [onlineOriginalMessages, setOnlineOriginalMessages] = useState<DiaryMessage[]>([]); // 온라인 채팅 원본 메시지 (읽기 전용)
+    const [aiChatMessages, setAiChatMessages] = useState<DiaryMessage[]>([]); // 온라인 채팅 탭의 AI와의 대화
+    const [currentSessionType, setCurrentSessionType] = useState<'ai' | 'online' | null>(null); // 현재 선택된 세션의 타입
     // 제목 기능 제거: 더 이상 사용하지 않음
     const [mood, setMood] = useState<{ emotion: string; score: number; color: string } | null>(null);
     const [messageCount, setMessageCount] = useState<number>(0); // 현재 메시지 개수
@@ -225,12 +229,55 @@ export default function Diary() {
             console.log('📂 Load Session:', {
                 sessionId,
                 mood: data?.session?.mood,
-                color: data?.session?.mood?.color
+                color: data?.session?.mood?.color,
+                type: data?.session?.type
             });
             const msgs: DiaryMessage[] = Array.isArray(data?.messages)
                         ? data.messages.map((m) => ({ id: m.id, role: m.role, content: m.content, createdAt: m.createdAt }))
                 : [];
-            setMessages(msgs);
+            
+            const sessionType = (data?.session?.type || 'ai') as 'ai' | 'online';
+            const originalMessageCount = data?.session?.originalMessageCount || 0;
+            setCurrentSessionType(sessionType);
+            
+            console.log('🔍 Session Type & Messages:', {
+                sessionType,
+                messageCount: msgs.length,
+                originalMessageCount,
+                messages: msgs
+            });
+            
+            // 온라인 채팅 세션인 경우, 원본 메시지와 AI 대화 메시지 분리
+            if (sessionType === 'online') {
+                // originalMessageCount가 0이거나 없으면 모든 메시지를 원본으로 처리
+                const effectiveOriginalCount = originalMessageCount > 0 ? originalMessageCount : msgs.length;
+                
+                // 원본 메시지와 AI 대화 메시지를 분리
+                const originalMsgs = msgs.slice(0, effectiveOriginalCount);
+                const allAiChatMsgs = msgs.slice(effectiveOriginalCount);
+                
+                // AI 대화에서 자동요약 요청 메시지 필터링
+                const aiChatMsgs = allAiChatMsgs.filter(msg => 
+                    !(msg.role === 'user' && msg.content.startsWith('[자동요약]'))
+                );
+                
+                console.log('✅ Splitting messages:', {
+                    original: originalMsgs.length,
+                    aiChatTotal: allAiChatMsgs.length,
+                    aiChatFiltered: aiChatMsgs.length,
+                    effectiveOriginalCount
+                });
+                
+                setOnlineOriginalMessages(originalMsgs);
+                setAiChatMessages(aiChatMsgs);
+                setMessages([]); // AI 대화 탭용 메시지 비움
+            } else {
+                console.log('✅ Setting AI messages:', msgs.length);
+                setMessages(msgs);
+                setOnlineOriginalMessages([]);
+                setAiChatMessages([]);
+            }
+            
             setMessageCount(msgs.length);
             setCanAnalyze(msgs.length >= minRequired);
           setMood(data?.session?.mood ?? null);
@@ -280,20 +327,88 @@ export default function Diary() {
             // eslint-disable-next-line react-hooks/exhaustive-deps
         }, [loading, user]);
 
+    // AI가 온라인 채팅 내용을 요약하는 함수
+    const generateAISummary = async (sessionId: string) => {
+        try {
+            setSending(true);
+            // 로딩 표시만 (사용자 메시지는 표시하지 않음)
+            setAiChatMessages([{ role: 'assistant', content: '…' }]);
+            
+            const res = await fetch(`/api/diary/session/${sessionId}/chat`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({ text: '[자동요약] 이 대화 내용을 간단히 요약해줄 수 있어?' }),
+            });
+            
+            if (res.ok) {
+                const data = await res.json();
+                // AI 응답만 표시 (사용자 요청 메시지는 제외)
+                setAiChatMessages([{ role: 'assistant', content: data?.assistant?.content || '대화 내용을 요약하지 못했습니다.' }]);
+            } else {
+                setAiChatMessages([{ role: 'assistant', content: '요약 생성에 실패했습니다.' }]);
+            }
+        } catch {
+            setAiChatMessages([{ role: 'assistant', content: '네트워크 오류가 발생했습니다.' }]);
+        } finally {
+            setSending(false);
+        }
+    };
+
+    // 온라인 채팅에서 저장 후 이동 시 처리
+    useEffect(() => {
+        const state = location.state as { activeTab?: 'ai' | 'online'; sessionId?: string; date?: string } | null;
+        if (state?.activeTab === 'online' && state?.sessionId) {
+            setActiveTab('online');
+            setSelected(state.sessionId);
+            if (state.date) {
+                setSelectedDate(state.date);
+                setExpandedDates(new Set([state.date]));
+            }
+            // 목록 새로고침 후 세션 로드
+            void refreshList().then(() => {
+                void loadSession(state.sessionId!).then(() => {
+                    // 세션 로드 후 AI 요약 자동 생성
+                    setTimeout(() => {
+                        void generateAISummary(state.sessionId!);
+                    }, 500);
+                });
+            });
+            // state 초기화
+            navigate(location.pathname, { replace: true, state: null });
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [location.state]);
+
     useEffect(() => {
         bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }, [messages, sending]);
+    }, [messages, aiChatMessages, sending]);
 
     const send = async () => {
         const text = input.trim();
         if (!text || sending) return;
         setSending(true);
-        const optimistic = [...messages, { role: 'user' as const, content: text }];
-        setMessages(optimistic);
+        
+        // 온라인 채팅 탭인 경우 aiChatMessages 사용
+        const isOnlineTab = currentSessionType === 'online';
+        
+        if (isOnlineTab) {
+            const optimistic = [...aiChatMessages, { role: 'user' as const, content: text }];
+            setAiChatMessages(optimistic);
+        } else {
+            const optimistic = [...messages, { role: 'user' as const, content: text }];
+            setMessages(optimistic);
+        }
+        
         setInput('');
         try {
             // 임시 타이핑 표시
-            setMessages((prev) => [...prev, { role: 'assistant', content: '…' }]);
+            if (isOnlineTab) {
+                setAiChatMessages((prev) => [...prev, { role: 'assistant', content: '…' }]);
+            } else {
+                setMessages((prev) => [...prev, { role: 'assistant', content: '…' }]);
+            }
+            
             const res = await fetch(`/api/diary/session/${selected}/chat`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -301,7 +416,11 @@ export default function Diary() {
                 body: JSON.stringify({ text }),
             });
             if (!res.ok) {
-                setMessages((prev) => [...prev.slice(0, -1), { role: 'assistant', content: '답변 생성에 실패했습니다.' }]);
+                if (isOnlineTab) {
+                    setAiChatMessages((prev) => [...prev.slice(0, -1), { role: 'assistant', content: '답변 생성에 실패했습니다.' }]);
+                } else {
+                    setMessages((prev) => [...prev.slice(0, -1), { role: 'assistant', content: '답변 생성에 실패했습니다.' }]);
+                }
                 return;
             }
             const data = await res.json();
@@ -310,9 +429,15 @@ export default function Diary() {
                 canAnalyze: data?.canAnalyze,
                 messageCount: data?.messageCount
             });
-            setMessages((prev) => [...prev.slice(0, -1), { role: 'assistant', content: data?.assistant?.content || '' }]);
+            
+            if (isOnlineTab) {
+                setAiChatMessages((prev) => [...prev.slice(0, -1), { role: 'assistant', content: data?.assistant?.content || '' }]);
+            } else {
+                setMessages((prev) => [...prev.slice(0, -1), { role: 'assistant', content: data?.assistant?.content || '' }]);
+            }
+            
             setMood(data?.mood ?? null);
-            setMessageCount(data?.messageCount || messages.length + 2);
+            setMessageCount(data?.messageCount || (isOnlineTab ? aiChatMessages.length + 2 : messages.length + 2));
             setMinRequired(data?.minRequired || 10);
             setCanAnalyze(data?.canAnalyze || false);
             
@@ -922,12 +1047,14 @@ export default function Diary() {
                     // AI 대화 탭 - 기존 UI 유지
                     <div style={{ ...bgStyle, border: '1px solid #e5e7eb', borderRadius: 12, minHeight: '70vh', padding: 12, position: 'relative', boxSizing: 'border-box' }}>
                         {/* 감정 오브: 채팅창 왼쪽 상단 고정, 크게 */}
-                        <div className="aurora-breathe" style={{ position: 'absolute', top: 0, left: -1, zIndex: 1, pointerEvents: 'none', width: 200, height: 200, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                            <EmotionOrbPremium 
-                                color={emotionOrbColor} 
-                                size={200}
-                                intensity={0.85}
-                            />
+                        <div style={{ position: 'absolute', top: -10, left: -10, zIndex: 1, pointerEvents: 'none', width: 200, height: 200, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <div className="aurora-breathe" style={{ width: 200, height: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', transformOrigin: 'center center' }}>
+                                <EmotionOrbPremium 
+                                    color={emotionOrbColor} 
+                                    size={200}
+                                    intensity={0.85}
+                                />
+                            </div>
                         </div>
                         {/* 날짜/감정/진행률: 오른쪽 상단 정렬 */}
                         <div style={{ position: 'absolute', top: 12, right: 12, textAlign: 'right', minWidth: 200 }}>
@@ -1057,7 +1184,7 @@ export default function Diary() {
                             </div>
                         )}
 
-                        <div className="diary-chat-area" style={{ border: '1px solid #e5e7eb', borderRadius: 12, height: '55vh', minHeight: 320, padding: 12, overflowY: 'auto', background: 'rgba(255,255,255,0.75)', width: 'min(100%, 1200px)', margin: '96px auto 0', boxSizing: 'border-box' }}>
+                        <div className="diary-chat-area" style={{ border: '1px solid #e5e7eb', borderRadius: 12, height: '55vh', maxHeight: '55vh', padding: 12, overflowY: 'auto', background: 'rgba(255,255,255,0.75)', width: 'min(100%, 1200px)', margin: '96px auto 0', boxSizing: 'border-box' }}>
                             {loadingDiary ? (
                                 <ChatLoadingSkeleton />
                             ) : (
@@ -1084,8 +1211,8 @@ export default function Diary() {
                     // 온라인 채팅 탭 - 상단: 온라인 대화 기록 (읽기 전용), 하단: AI와 대화
                     <div style={{ ...bgStyle, border: '1px solid #e5e7eb', borderRadius: 12, height: 'calc(100vh - 88px)', padding: 16, boxSizing: 'border-box', display: 'flex', flexDirection: 'column', gap: 16 }}>
                         {/* 상단: 온라인 채팅 기록 (읽기 전용) */}
-                        <div style={{ flex: '0 0 280px', display: 'flex', flexDirection: 'column' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                        <div style={{ flex: '0 0 280px', minHeight: 0, maxHeight: '280px', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, flexShrink: 0 }}>
                                 <div style={{ fontSize: 18, fontWeight: 700, color: '#374151', display: 'flex', alignItems: 'center', gap: 8 }}>
                                     <span>💬</span>
                                     <span>온라인 채팅 기록</span>
@@ -1094,6 +1221,7 @@ export default function Diary() {
                             </div>
                             <div style={{ 
                                 flex: 1, 
+                                minHeight: 0,
                                 border: '2px solid #e5e7eb', 
                                 borderRadius: 12, 
                                 padding: 12, 
@@ -1103,8 +1231,8 @@ export default function Diary() {
                             }}>
                                 {loadingDiary ? (
                                     <ChatLoadingSkeleton />
-                                ) : messages.length > 0 ? (
-                                    messages.map(Bubble)
+                                ) : onlineOriginalMessages.length > 0 ? (
+                                    onlineOriginalMessages.map(Bubble)
                                 ) : (
                                     <div style={{ 
                                         textAlign: 'center', 
@@ -1119,13 +1247,13 @@ export default function Diary() {
                                         <div style={{ fontSize: 14 }}>온라인 채팅 기록이 없습니다</div>
                                     </div>
                                 )}
-                                <div ref={bottomRef} />
                             </div>
                         </div>
 
                         {/* 하단: AI와 대화 */}
                         <div style={{ 
                             flex: '1 1 auto', 
+                            minHeight: 0,
                             border: '2px solid #6366f1', 
                             borderRadius: 16, 
                             padding: 20, 
@@ -1137,10 +1265,10 @@ export default function Diary() {
                             flexDirection: 'column'
                         }}>
                             {/* 오로라: 좌상단 */}
-                            <div className="aurora-breathe" style={{ 
+                            <div style={{ 
                                 position: 'absolute', 
-                                top: -2, 
-                                left: -16, 
+                                top: -10, 
+                                left: 0, 
                                 zIndex: 1, 
                                 pointerEvents: 'none', 
                                 width: 120, 
@@ -1149,11 +1277,13 @@ export default function Diary() {
                                 alignItems: 'center', 
                                 justifyContent: 'center' 
                             }}>
-                                <EmotionOrbPremium color={onlineOrbColor} size={100} intensity={0.7} />
+                                <div className="aurora-breathe" style={{ width: 100, height: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', transformOrigin: 'center center' }}>
+                                    <EmotionOrbPremium color={onlineOrbColor} size={100} intensity={0.7} />
+                                </div>
                             </div>
                             
-                            <div style={{ marginBottom: 12, paddingTop: 12 }}>
-                                <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 6, color: '#374151', display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <div style={{ marginBottom: 12, paddingTop: 12, flexShrink: 0, textAlign: 'right' }}>
+                                <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 6, color: '#374151', display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'flex-end' }}>
                                     <span>🤖</span>
                                     <span>AI와 대화하기</span>
                                 </div>
@@ -1162,7 +1292,35 @@ export default function Diary() {
                                 </div>
                             </div>
                             
-                            <form onSubmit={(e) => { e.preventDefault(); void send(); }} style={{ display: 'flex', alignItems: 'flex-end', gap: 10, marginTop: 'auto' }}>
+                            {/* AI 대화 메시지 영역 */}
+                            <div style={{ 
+                                flex: 1,
+                                overflowY: 'auto',
+                                border: '1px solid #e5e7eb',
+                                borderRadius: 12,
+                                padding: 12,
+                                marginBottom: 12,
+                                background: 'rgba(255,255,255,0.5)',
+                                minHeight: 0
+                            }}>
+                                {loadingDiary ? (
+                                    <ChatLoadingSkeleton />
+                                ) : aiChatMessages.length > 0 ? (
+                                    aiChatMessages.map(Bubble)
+                                ) : (
+                                    <div style={{ 
+                                        textAlign: 'center', 
+                                        color: '#9ca3af', 
+                                        padding: '40px 20px',
+                                        fontSize: 14
+                                    }}>
+                                        💭 온라인 채팅에 대해 AI와 대화를 시작해보세요
+                                    </div>
+                                )}
+                                <div ref={bottomRef} />
+                            </div>
+                            
+                            <form onSubmit={(e) => { e.preventDefault(); void send(); }} style={{ display: 'flex', alignItems: 'flex-end', gap: 10, flexShrink: 0 }}>
                                 <textarea
                                     value={input}
                                     onChange={(e) => setInput(e.target.value)}
