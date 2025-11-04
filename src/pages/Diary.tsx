@@ -1,5 +1,6 @@
 // Diary.tsx — 날짜별 다이어리 + AI 대화 저장/조회
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, Component } from 'react';
+import type { ReactNode } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import EmotionOrbPremium from '../components/EmotionOrbPremium';
@@ -10,6 +11,41 @@ import type { DiarySessionResponse, DiaryMessageResponse, DiarySessionsApiRespon
 
 type DiaryListItem = DiarySessionResponse;
 type DiaryMessage = DiaryMessageResponse;
+
+// WebGL 에러 바운더리
+class WebGLErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean }> {
+  constructor(props: { children: ReactNode }) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error: Error) {
+    console.error('WebGL Error:', error);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{ 
+          width: '100%', 
+          height: '100%', 
+          display: 'flex', 
+          alignItems: 'center', 
+          justifyContent: 'center',
+          color: '#9ca3af',
+          fontSize: 14
+        }}>
+          오브 로딩 중...
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 function todayKey() {
     const d = new Date();
@@ -1343,14 +1379,16 @@ export default function Diary() {
                                 justifyContent: 'center', 
                                 transformOrigin: 'center center'
                             }}>
-                                <EmotionOrbPremium 
-                                    color={emotionOrbColor} 
-                                    size={200}
-                                    intensity={0.85}
-                                    analyzing={isWaitingAnalysis}
-                                    showCompleted={showCompletedAnimation}
-                                    messageCount={messageCount}
-                                />
+                                <WebGLErrorBoundary>
+                                    <EmotionOrbPremium 
+                                        color={emotionOrbColor} 
+                                        size={200}
+                                        intensity={0.85}
+                                        analyzing={isWaitingAnalysis}
+                                        showCompleted={showCompletedAnimation}
+                                        messageCount={messageCount}
+                                    />
+                                </WebGLErrorBoundary>
                             </div>
                         </div>
                         

@@ -1,4 +1,4 @@
-import { memo, useEffect, useMemo, useRef, useState } from 'react';
+import { memo, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
 import { Environment, MeshTransmissionMaterial } from '@react-three/drei';
 import * as THREE from 'three';
@@ -421,6 +421,9 @@ const EmotionOrbPremium = memo(function EmotionOrbPremium({
   // 진단 중일 때는 순환 색상, 아니면 지정된 색상
   const displayColor = analyzing ? EMOTION_COLORS[cyclingColorIndex] : color;
   
+  // Canvas remount key (네트워크 환경 안정성)
+  const [canvasKey, setCanvasKey] = useState(0);
+  
   // 컴포넌트 마운트 시 한 번만 로그
   useEffect(() => {
     if (import.meta.env.DEV) {
@@ -432,6 +435,13 @@ const EmotionOrbPremium = memo(function EmotionOrbPremium({
         intensity
       });
     }
+    
+    // Canvas가 마운트되지 않을 경우 대비 (네트워크 환경)
+    const timeout = setTimeout(() => {
+      setCanvasKey(prev => prev + 1);
+    }, 100);
+    
+    return () => clearTimeout(timeout);
   }, []); // 빈 의존성 배열 = 마운트 시 한 번만
   
   return (
@@ -467,55 +477,29 @@ const EmotionOrbPremium = memo(function EmotionOrbPremium({
         }}
       >
         <Canvas
+          key={canvasKey}
           dpr={[1, 1.5]} // dpr을 낮춰서 리소스 절약
-          frameloop="always" // 항상 렌더링
+          frameloop="always" // 항상 렌더링 (네트워크 환경 안정성)
           camera={{ position: [0, 0, 3.8], fov: 38 }}
           gl={{ 
             antialias: true, 
             alpha: true, 
-            powerPreference: 'default',
+            powerPreference: 'default', // 네트워크 환경 호환성
             toneMapping: THREE.ACESFilmicToneMapping,
             toneMappingExposure: 1.0,
             failIfMajorPerformanceCaveat: false,
-            preserveDrawingBuffer: false, // true에서 false로 변경 (메모리 절약)
+            preserveDrawingBuffer: false,
             stencil: false,
-            depth: true, // depth 버퍼 활성화
+            depth: true,
           }}
           style={{ 
             display: 'block',
-            touchAction: 'none', // 터치 이벤트 비활성화
+            touchAction: 'none',
           }}
           onCreated={({ gl, scene }) => {
             // WebGL 설정 최적화
             gl.setClearColor(0x000000, 0);
-            scene.background = null; // 배경 투명
-            
-            // 컨텍스트 손실 방지
-            const canvas = gl.domElement;
-            
-            const handleContextLost = (event: Event) => {
-              event.preventDefault();
-              console.warn('⚠️ WebGL context lost, preventing default...');
-              
-              // 컨텍스트 복구 시도
-              setTimeout(() => {
-                const gl = canvas.getContext('webgl2', { 
-                  preserveDrawingBuffer: false,
-                  antialias: true,
-                  alpha: true
-                });
-                if (gl) {
-                  console.log('✅ WebGL context manually restored');
-                }
-              }, 100);
-            };
-            
-            const handleContextRestored = () => {
-              console.log('✅ WebGL context restored');
-            };
-            
-            canvas.addEventListener('webglcontextlost', handleContextLost, false);
-            canvas.addEventListener('webglcontextrestored', handleContextRestored, false);
+            scene.background = null;
             
             if (import.meta.env.DEV) {
               console.log('✅ Canvas created successfully');
@@ -546,8 +530,10 @@ const EmotionOrbPremium = memo(function EmotionOrbPremium({
             color="#fff8f0" 
           />
 
-          {/* HDR environment for realistic reflections */}
-          <Environment preset="sunset" />
+          {/* HDR environment for realistic reflections - Suspense로 감싸기 */}
+          <Suspense fallback={null}>
+            <Environment preset="sunset" />
+          </Suspense>
 
           <LiquidCore color={displayColor} />
         </Canvas>
