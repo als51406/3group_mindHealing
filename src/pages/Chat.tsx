@@ -28,6 +28,7 @@ export default function Chat() {
     const [mood, setMood] = useState<{ emotion: string; score: number; color: string } | null>(null);
     const [isAnalyzing, setIsAnalyzing] = useState(false); // 감정 분석 중
     const [savingToDiary, setSavingToDiary] = useState(false); // 다이어리 저장 중
+    const [emotionColor, setEmotionColor] = useState<string | null>(null); // 감정 색상
     const MIN_REQUIRED_MESSAGES = 5; // 최소 요구 메시지 수
     
     const bottomRef = useRef<HTMLDivElement | null>(null); // 스크롤 맨 아래로 이동시키기 위한 참조
@@ -92,6 +93,45 @@ export default function Chat() {
             content = content.replace(jsonMatch[0], "").trim();
         }
         return content;
+    };
+
+    // HEX 색상에서 유사 그라데이션 생성 (밝게/어둡게 변형)
+    const generateGradientFromColor = (hexColor: string): string => {
+        // HEX를 RGB로 변환
+        const hex = hexColor.replace('#', '');
+        const r = parseInt(hex.substring(0, 2), 16);
+        const g = parseInt(hex.substring(2, 4), 16);
+        const b = parseInt(hex.substring(4, 6), 16);
+
+        // 밝은 버전 (20% 밝게)
+        const lighten = (val: number) => Math.min(255, Math.floor(val * 1.2));
+        const r1 = lighten(r);
+        const g1 = lighten(g);
+        const b1 = lighten(b);
+
+        // 어두운 버전 (20% 어둡게)
+        const darken = (val: number) => Math.max(0, Math.floor(val * 0.8));
+        const r2 = darken(r);
+        const g2 = darken(g);
+        const b2 = darken(b);
+
+        // 약간 색조 변경 (Hue shift)
+        const r3 = Math.min(255, Math.floor(r * 0.9 + g * 0.1));
+        const g3 = Math.min(255, Math.floor(g * 0.9 + b * 0.1));
+        const b3 = Math.min(255, Math.floor(b * 0.9 + r * 0.1));
+
+        const r4 = Math.min(255, Math.floor(r * 0.85 + b * 0.15));
+        const g4 = Math.min(255, Math.floor(g * 0.85 + r * 0.15));
+        const b4 = Math.min(255, Math.floor(b * 0.85 + g * 0.15));
+
+        return `linear-gradient(
+            135deg,
+            rgb(${r1}, ${g1}, ${b1}) 0%,
+            rgb(${r}, ${g}, ${b}) 25%,
+            rgb(${r3}, ${g3}, ${b3}) 50%,
+            rgb(${r2}, ${g2}, ${b2}) 75%,
+            rgb(${r4}, ${g4}, ${b4}) 100%
+        )`;
     };
 
     // 로그인 상태 확인: 로그인 안 되어 있으면 /login으로 이동
@@ -208,13 +248,17 @@ export default function Chat() {
                 // json에 color 속성이 있을 때
                 if (json.color) {
                     try {
+                        // 감정 색상 state 업데이트 (배경 그라데이션에 사용)
+                        setEmotionColor(json.color);
+                        
                         // 바디 배경을 변경하기 전에 이전 값을 저장
                         if (prevBodyBgRef.current === null) {
                             prevBodyBgRef.current = document.body.style.backgroundColor || '';
                         }
                         // Chat 페이지 전용 표시자 설정 (다른 페이지에서 흰색 강제화에 사용)
                         try { document.body.dataset.chatBg = '1'; } catch {}
-                        document.body.style.backgroundColor = json.color;
+                        // body 배경은 투명으로 (그라데이션 배경이 보이도록)
+                        document.body.style.backgroundColor = 'transparent';
 
                         // 네비게이션(nav)이 투명(배경 없음)이라면 흰색 배경을 적용합니다.
                         // 변경하기 전에 nav의 이전 inline 스타일을 저장하여 언마운트 시 복원합니다.
@@ -308,6 +352,7 @@ export default function Chat() {
             
             if (analyzedMood && analyzedMood.emotion && analyzedMood.color) {
                 setMood(analyzedMood);
+                setEmotionColor(analyzedMood.color); // 배경 그라데이션 색상 업데이트
                 showToast({ 
                     message: `✨ 감정 분석 완료! ${analyzedMood.emotion} (${Math.round(analyzedMood.score * 100)}%)`, 
                     type: 'success', 
@@ -484,9 +529,18 @@ export default function Chat() {
 
     return (
         <>
+            {/* 회전하는 그라데이션 배경 */}
+            <div 
+                className="chat-animated-bg" 
+                style={emotionColor ? {
+                    background: generateGradientFromColor(emotionColor),
+                    backgroundSize: '400% 400%'
+                } : undefined}
+            />
+            
             <ToastContainer />
-            <div style={{ maxWidth: 720, margin: '0 auto', padding: '24px 16px' }}>
-                <h2 style={{ textAlign: 'center', margin: '8px 0 16px' }}>AI 채팅 페이지</h2>
+            <div style={{ maxWidth: 720, margin: '0 auto', padding: '24px 16px', position: 'relative', zIndex: 1 }}>
+                <h2 style={{ textAlign: 'center', margin: '8px 0 16px', color: '#fff', textShadow: '0 2px 4px rgba(0,0,0,0.2)' }}>AI 채팅 페이지</h2>
 
                 {/* 감정 진단 상태 섹션 */}
                 <div style={{
@@ -494,15 +548,17 @@ export default function Chat() {
                     padding: '16px',
                     borderRadius: 12,
                     background: mood 
-                        ? 'linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(5, 150, 105, 0.1) 100%)'
+                        ? 'linear-gradient(135deg, rgba(16, 185, 129, 0.95) 0%, rgba(5, 150, 105, 0.95) 100%)'
                         : isAnalyzing
-                            ? 'linear-gradient(135deg, rgba(99, 102, 241, 0.1) 0%, rgba(139, 92, 246, 0.1) 100%)'
-                            : 'linear-gradient(135deg, rgba(251, 191, 36, 0.1) 0%, rgba(245, 158, 11, 0.1) 100%)',
+                            ? 'linear-gradient(135deg, rgba(99, 102, 241, 0.95) 0%, rgba(139, 92, 246, 0.95) 100%)'
+                            : 'linear-gradient(135deg, rgba(251, 191, 36, 0.95) 0%, rgba(245, 158, 11, 0.95) 100%)',
                     border: mood 
-                        ? '2px solid #10b981' 
+                        ? '2px solid rgba(16, 185, 129, 0.3)' 
                         : isAnalyzing
-                            ? '2px solid #6366f1'
-                            : '2px solid #fbbf24',
+                            ? '2px solid rgba(99, 102, 241, 0.3)'
+                            : '2px solid rgba(251, 191, 36, 0.3)',
+                    backdropFilter: 'blur(10px)',
+                    boxShadow: '0 4px 20px rgba(0,0,0,0.15)'
                 }}>
                     {/* 상단 헤더 영역 */}
                     <div style={{ 
@@ -518,7 +574,7 @@ export default function Chat() {
                                 {mood ? '✨' : isAnalyzing ? '🔄' : '📊'}
                             </span>
                             <div>
-                                <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 4 }}>
+                                <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 4, color: '#fff' }}>
                                     {mood 
                                         ? '진단 완료' 
                                         : isAnalyzing 
@@ -527,12 +583,12 @@ export default function Chat() {
                                     }
                                 </div>
                                 {mood && (
-                                    <div style={{ fontSize: 14, color: '#065f46' }}>
+                                    <div style={{ fontSize: 14, color: 'rgba(255,255,255,0.9)' }}>
                                         감정: <strong>{mood.emotion}</strong> ({Math.round(mood.score * 100)}%)
                                     </div>
                                 )}
                                 {!mood && !isAnalyzing && messageCount >= 2 && (
-                                    <div style={{ fontSize: 13, color: '#92400e' }}>
+                                    <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.85)' }}>
                                         {messageCount >= MIN_REQUIRED_MESSAGES 
                                             ? '감정 분석을 시작할 수 있습니다' 
                                             : `${MIN_REQUIRED_MESSAGES - messageCount}번 더 대화하면 분석 가능합니다`
@@ -636,13 +692,15 @@ export default function Chat() {
                 {/* 채팅 메시지 영역 */}
             <div
                 style={{
-                    border: '1px solid #e5e7eb',
+                    border: '1px solid rgba(255, 255, 255, 0.3)',
                     borderRadius: 12,
                     height: '60vh',
                     minHeight: 360,
                     padding: 12,
                     overflowY: 'auto',
-                    background: '#ffffff',
+                    background: 'rgba(255, 255, 255, 0.85)',
+                    backdropFilter: 'blur(10px)',
+                    boxShadow: '0 4px 20px rgba(0,0,0,0.15)'
                 }}
             >
                 {/* 모든 메시지 렌더링 */}
@@ -708,9 +766,12 @@ export default function Chat() {
                     style={{
                         flex: 1,
                         padding: 10,
-                        border: '1px solid #e5e7eb',
+                        border: '1px solid rgba(255, 255, 255, 0.3)',
                         borderRadius: 8,
                         resize: 'vertical',
+                        background: 'rgba(255, 255, 255, 0.9)',
+                        backdropFilter: 'blur(10px)',
+                        boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
                     }}
                 />
                 <button
@@ -719,10 +780,15 @@ export default function Chat() {
                     style={{
                         padding: '10px 14px',
                         borderRadius: 8,
-                        border: '1px solid #2563eb',
-                        background: sending ? '#93c5fd' : '#2563eb',
+                        border: 'none',
+                        background: sending 
+                            ? 'rgba(147, 197, 253, 0.8)' 
+                            : 'linear-gradient(135deg, #2563eb 0%, #1e40af 100%)',
                         color: '#fff',
                         cursor: sending ? 'not-allowed' : 'pointer',
+                        fontWeight: 700,
+                        boxShadow: sending ? 'none' : '0 4px 12px rgba(37, 99, 235, 0.4)',
+                        transition: 'all 0.3s ease'
                     }}
                 >
                     {sending ? '전송중…' : '전송'}

@@ -1,3 +1,35 @@
+/* Chat 페이지 회전 그라데이션 배경 */
+.chat-animated-bg {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    z-index: -1;
+    background: linear-gradient(
+        135deg,
+        #667eea 0%,
+        #764ba2 25%,
+        #f093fb 50%,
+        #4facfe 75%,
+        #667eea 100%
+    );
+    background-size: 400% 400%;
+    animation: chatGradientRotate 15s ease infinite;
+}
+
+@keyframes chatGradientRotate {
+    0% {
+        background-position: 0% 50%;
+    }
+    50% {
+        background-position: 100% 50%;
+    }
+    100% {
+        background-position: 0% 50%;
+    }
+}
+
 /* transition은 Chat 페이지에서만 적용되도록 data 속성으로 범위를 좁힙니다.
    이렇게 하면 Chat에서 색을 바꿀 때는 부드럽게 변화하지만,
    다른 페이지로 이동 시 data 속성을 제거하면 트랜지션 규칙이 사라져
