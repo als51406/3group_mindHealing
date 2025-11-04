@@ -79,6 +79,41 @@
   }
 }
 
+/* Analyzing text pulse animation */
+@keyframes pulse-text {
+  0%, 100% {
+    opacity: 0.6;
+    transform: translate(-50%, -50%) scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1.05);
+  }
+}
+
+/* Completed text animation - appear, hold, fade out */
+@keyframes completed-text {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.8);
+  }
+  15% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1.1);
+  }
+  25% {
+    transform: translate(-50%, -50%) scale(1);
+  }
+  75% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.95);
+  }
+}
+
 /* Accessibility - respect reduced motion */
 @media (prefers-reduced-motion: reduce) {
   .emotion-orb-premium-sparkle {

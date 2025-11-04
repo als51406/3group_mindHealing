@@ -895,51 +895,40 @@ app.post('/api/diary/session/:id/chat', authMiddleware, async (req: any, res) =>
     
     await db.collection('diary_session_messages').insertOne({ sessionId: session._id, userId, role: 'assistant', content: cleanReply, createdAt: new Date() });
     
-    // 감정 분석: 매 메시지마다 업데이트 (AI가 준 색상 우선 사용)
+    // 감정 분석: 사용자 메시지만 카운트
     let finalMood = session.mood || null;
-    const totalMessages = history.length + 1;
-    const minMessages = 10;
+    const userMessages = history.filter((m: any) => m.role === 'user');
+    const userMessageCount = userMessages.length + 1; // 방금 추가한 사용자 메시지 포함
+    const minMessages = 5;
     
-    // AI가 색상을 제공했다면 즉시 사용
-    if (extractedColor) {
-      // 최근 2개 메시지만 분석 (가장 최근 감정에 집중)
-      const recentUserMessages = history
-        .filter((m: any) => m.role === 'user')
+    console.log('📊 메시지 카운트:', {
+      userMessageCount,
+      minMessages,
+      canAnalyze: userMessageCount >= minMessages
+    });
+    
+    // 사용자 메시지가 5개 이상일 때만 감정 분석
+    if (userMessageCount >= minMessages) {
+      // 최근 2개 사용자 메시지만 분석 (가장 최근 감정에 집중)
+      const recentUserMessages = [...userMessages, { content: text }]
         .slice(-2)
         .map((m: any) => m.content)
         .join(' ');
+      
       const mood = await detectEmotionFromText(recentUserMessages);
-      finalMood = { ...mood, color: extractedColor }; // AI가 준 색상 사용!
+      
+      // AI가 색상을 제공했다면 사용, 아니면 감정 분석 색상 사용
+      const finalColor = extractedColor || (await personalizedColorForEmotion(db, userId, mood.color, mood.emotion));
+      finalMood = { ...mood, color: finalColor };
+      
       console.log('✨ 최종 감정:', finalMood);
       
       await db.collection('diary_sessions').updateOne(
         { _id: session._id }, 
         { $set: { mood: finalMood, lastUpdatedAt: new Date() } }
       );
-    } else if (totalMessages >= minMessages) {
-      // AI가 색상을 안 줬고, 최소 메시지 이상이면 매번 감정 분석 업데이트
-      // 최근 2개 메시지만 분석 (가장 최근 감정에 집중)
-      const recentUserMessages = history
-        .filter((m: any) => m.role === 'user')
-        .slice(-2)
-        .map((m: any) => m.content)
-        .join(' ');
-      const mood = await detectEmotionFromText(recentUserMessages);
-      const personalizedColor = await personalizedColorForEmotion(db, userId, mood.color, mood.emotion);
-      finalMood = { ...mood, color: personalizedColor };
-      
-      console.log('🔄 감정 업데이트:', {
-        emotion: finalMood.emotion,
-        color: finalMood.color,
-        score: finalMood.score
-      });
-      
-      await db.collection('diary_sessions').updateOne(
-        { _id: session._id }, 
-        { $set: { mood: finalMood, lastUpdatedAt: new Date() } }
-      );
     } else {
-      // 최소 메시지 미만인 경우 타임스탬프만 업데이트
+      // 최소 사용자 메시지 미만인 경우 타임스탬프만 업데이트
       await db.collection('diary_sessions').updateOne(
         { _id: session._id }, 
         { $set: { lastUpdatedAt: new Date() } }
@@ -950,9 +939,9 @@ app.post('/api/diary/session/:id/chat', authMiddleware, async (req: any, res) =>
       ok: true, 
       assistant: { content: cleanReply }, 
       mood: finalMood,
-      messageCount: totalMessages,
+      messageCount: userMessageCount,
       minRequired: minMessages,
-      canAnalyze: totalMessages >= minMessages,
+      canAnalyze: userMessageCount >= minMessages,
       extractedColor: extractedColor // 디버깅용
     });
   } catch (e: any) {

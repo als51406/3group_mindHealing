@@ -1,5 +1,5 @@
 // Diary.tsx — 날짜별 다이어리 + AI 대화 저장/조회
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import EmotionOrbPremium from '../components/EmotionOrbPremium';
@@ -66,9 +66,13 @@ export default function Diary() {
     // 제목 기능 제거: 더 이상 사용하지 않음
     const [mood, setMood] = useState<{ emotion: string; score: number; color: string } | null>(null);
     const [messageCount, setMessageCount] = useState<number>(0); // 현재 메시지 개수
-    const [minRequired, setMinRequired] = useState<number>(10); // 최소 요구 메시지 수
-    const [canAnalyze, setCanAnalyze] = useState<boolean>(false); // 분석 가능 여부
+    const MIN_REQUIRED_MESSAGES = 5; // 최소 요구 메시지 수 (상수)
+    
+    // 분석 가능 여부 계산 (useMemo)
+    const canAnalyze = useMemo(() => messageCount >= MIN_REQUIRED_MESSAGES, [messageCount]);
+    
     const [isAnalyzing, setIsAnalyzing] = useState(false); // 수동 분석 중
+    const [showCompletedAnimation, setShowCompletedAnimation] = useState(false); // 진단 완료 애니메이션
     const [input, setInput] = useState('');
     const [sending, setSending] = useState(false);
     const [loadingDiary, setLoadingDiary] = useState(false);
@@ -78,6 +82,7 @@ export default function Diary() {
     const [editingTitle, setEditingTitle] = useState<string>(''); // 수정 중인 제목
     const [filterDate, setFilterDate] = useState<string | null>(null); // 달력에서 선택한 날짜 필터
     const [searchQuery, setSearchQuery] = useState<string>(''); // 검색어
+    const [pendingOnlineSessionId, setPendingOnlineSessionId] = useState<string | null>(null); // 온라인 채팅 저장 후 자동 선택할 세션 ID
     const bottomRef = useRef<HTMLDivElement | null>(null);
 
     useEffect(() => {
@@ -103,6 +108,11 @@ export default function Diary() {
     const onlineOrbColor = useMemo(() => {
         return mood?.color || '#6366f1';
     }, [mood?.color]);
+    
+    // 감정 분석 대기 중 상태 (5개 미만 메시지 && 감정 미분석) - 채팅 전부터 색상 순환
+    const isWaitingAnalysis = useMemo(() => {
+        return messageCount < 5 && !mood; // 0개부터 색상 순환
+    }, [messageCount, mood]);
 
     // 검색어로 AI 세션 필터링
     const searchFilteredAISessions = useMemo(() => {
@@ -193,11 +203,12 @@ export default function Diary() {
         });
     };
 
-      const refreshList = async () => {
+    // useCallback으로 최적화된 refreshList
+    const refreshList = useCallback(async () => {
         try {
             setLoadingList(true);
-          // AI 세션 목록 조회
-          const aiRes = await fetch('/api/diary/sessions?type=ai', { credentials: 'include' });
+            // AI 세션 목록 조회
+            const aiRes = await fetch('/api/diary/sessions?type=ai', { credentials: 'include' });
             if (aiRes.ok) {
                 const aiData: DiarySessionsApiResponse = await aiRes.json();
                 if (Array.isArray(aiData?.items)) {
@@ -218,7 +229,7 @@ export default function Diary() {
         } finally {
             setLoadingList(false);
         }
-    };
+    }, [showToast]);
 
       const loadSession = async (sessionId: string) => {
         try {
@@ -226,12 +237,10 @@ export default function Diary() {
           const res = await fetch(`/api/diary/session/${sessionId}`, { credentials: 'include' });
             if (!res.ok) return;
                     const data: DiarySessionDetailApiResponse = await res.json();
-            console.log('📂 Load Session:', {
-                sessionId,
-                mood: data?.session?.mood,
-                color: data?.session?.mood?.color,
-                type: data?.session?.type
-            });
+            // DEV 환경 디버깅
+            if (import.meta.env.DEV) {
+                console.log('📂 Load Session:', { sessionId, mood: data?.session?.mood });
+            }
             const msgs: DiaryMessage[] = Array.isArray(data?.messages)
                         ? data.messages.map((m) => ({ id: m.id, role: m.role, content: m.content, createdAt: m.createdAt }))
                 : [];
@@ -240,12 +249,10 @@ export default function Diary() {
             const originalMessageCount = data?.session?.originalMessageCount || 0;
             setCurrentSessionType(sessionType);
             
-            console.log('🔍 Session Type & Messages:', {
-                sessionType,
-                messageCount: msgs.length,
-                originalMessageCount,
-                messages: msgs
-            });
+            // DEV 환경 디버깅
+            if (import.meta.env.DEV) {
+                console.log('🔍 Session:', { sessionType, count: msgs.length });
+            }
             
             // 온라인 채팅 세션인 경우, 원본 메시지와 AI 대화 메시지 분리
             if (sessionType === 'online') {
@@ -261,25 +268,23 @@ export default function Diary() {
                     !(msg.role === 'user' && msg.content.startsWith('[자동요약]'))
                 );
                 
-                console.log('✅ Splitting messages:', {
-                    original: originalMsgs.length,
-                    aiChatTotal: allAiChatMsgs.length,
-                    aiChatFiltered: aiChatMsgs.length,
-                    effectiveOriginalCount
-                });
+                if (import.meta.env.DEV) {
+                    console.log('✅ Split:', { original: originalMsgs.length, aiChat: aiChatMsgs.length });
+                }
                 
                 setOnlineOriginalMessages(originalMsgs);
                 setAiChatMessages(aiChatMsgs);
                 setMessages([]); // AI 대화 탭용 메시지 비움
             } else {
-                console.log('✅ Setting AI messages:', msgs.length);
+                if (import.meta.env.DEV) console.log('✅ AI messages:', msgs.length);
                 setMessages(msgs);
                 setOnlineOriginalMessages([]);
                 setAiChatMessages([]);
             }
             
-            setMessageCount(msgs.length);
-            setCanAnalyze(msgs.length >= minRequired);
+            // 사용자 메시지만 카운트
+            const userMsgCount = msgs.filter(m => m.role === 'user').length;
+            setMessageCount(userMsgCount);
           setMood(data?.session?.mood ?? null);
           setSelectedDate(String(data?.session?.date || todayKey()));
             await refreshList();
@@ -359,32 +364,71 @@ export default function Diary() {
     useEffect(() => {
         const state = location.state as { activeTab?: 'ai' | 'online'; sessionId?: string; date?: string } | null;
         if (state?.activeTab === 'online' && state?.sessionId) {
+            if (import.meta.env.DEV) {
+                console.log('🔵 Online chat saved, navigating to diary:', {
+                    sessionId: state.sessionId,
+                    date: state.date
+                });
+            }
+            
             setActiveTab('online');
-            setSelected(state.sessionId);
             if (state.date) {
                 setSelectedDate(state.date);
                 setExpandedDates(new Set([state.date]));
             }
-            // 목록 새로고침 후 세션 로드
-            void refreshList().then(() => {
-                void loadSession(state.sessionId!).then(() => {
-                    // 세션 로드 후 AI 요약 자동 생성
-                    setTimeout(() => {
-                        void generateAISummary(state.sessionId!);
-                    }, 500);
-                });
-            });
+            
+            // pending 세션 ID 설정 (onlineList 업데이트 후 자동 선택됨)
+            setPendingOnlineSessionId(state.sessionId);
+            
+            // 목록 새로고침
+            void refreshList();
+            
             // state 초기화
             navigate(location.pathname, { replace: true, state: null });
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [location.state]);
+    
+    // onlineList 업데이트 시 pending 세션 자동 선택
+    useEffect(() => {
+        if (pendingOnlineSessionId && onlineList.length > 0) {
+            // onlineList에서 해당 세션을 찾음
+            const targetSession = onlineList.find(item => item._id === pendingOnlineSessionId);
+            
+            if (targetSession) {
+                if (import.meta.env.DEV) {
+                    console.log('✅ Auto-selecting online session:', pendingOnlineSessionId);
+                }
+                
+                // 세션 선택
+                setSelected(pendingOnlineSessionId);
+                setSelectedDate(targetSession.date);
+                
+                // 세션 데이터 로드
+                void loadSession(pendingOnlineSessionId).then(() => {
+                    if (import.meta.env.DEV) {
+                        console.log('✅ Auto-loaded session data');
+                    }
+                    
+                    // AI 요약 자동 생성
+                    setTimeout(() => {
+                        void generateAISummary(pendingOnlineSessionId);
+                    }, 500);
+                });
+                
+                // pending 상태 초기화
+                setPendingOnlineSessionId(null);
+            }
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [onlineList, pendingOnlineSessionId]);
 
     useEffect(() => {
         bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, [messages, aiChatMessages, sending]);
 
-    const send = async () => {
+    // useCallback으로 최적화된 send
+    const send = useCallback(async () => {
         const text = input.trim();
         if (!text || sending) return;
         setSending(true);
@@ -424,11 +468,9 @@ export default function Diary() {
                 return;
             }
             const data = await res.json();
-            console.log('📨 Server Response:', {
-                mood: data?.mood,
-                canAnalyze: data?.canAnalyze,
-                messageCount: data?.messageCount
-            });
+            if (import.meta.env.DEV) {
+                console.log('📨 Response:', { mood: data?.mood?.emotion });
+            }
             
             if (isOnlineTab) {
                 setAiChatMessages((prev) => [...prev.slice(0, -1), { role: 'assistant', content: data?.assistant?.content || '' }]);
@@ -436,18 +478,27 @@ export default function Diary() {
                 setMessages((prev) => [...prev.slice(0, -1), { role: 'assistant', content: data?.assistant?.content || '' }]);
             }
             
-            setMood(data?.mood ?? null);
-            setMessageCount(data?.messageCount || (isOnlineTab ? aiChatMessages.length + 2 : messages.length + 2));
-            setMinRequired(data?.minRequired || 10);
-            setCanAnalyze(data?.canAnalyze || false);
+            const newMood = data?.mood ?? null;
+            const newMessageCount = data?.messageCount || (isOnlineTab ? aiChatMessages.length + 2 : messages.length + 2);
+            const prevCanAnalyze = canAnalyze;
             
-            // 최소 메시지 도달 시 토스트 알림
-            if (data?.canAnalyze && !canAnalyze && data?.mood) {
+            setMood(newMood);
+            setMessageCount(newMessageCount);
+            
+            // 최소 메시지 도달 시 토스트 알림 + 진단 완료 애니메이션
+            const newCanAnalyze = newMessageCount >= MIN_REQUIRED_MESSAGES;
+            if (newCanAnalyze && !prevCanAnalyze && newMood) {
                 showToast({ 
                     message: '✨ 충분한 대화가 쌓였어요! 전체 감정 분석이 완료되었습니다.', 
                     type: 'success',
                     duration: 4000
                 });
+                
+                // 진단 완료 애니메이션 표시
+                setShowCompletedAnimation(true);
+                setTimeout(() => {
+                    setShowCompletedAnimation(false);
+                }, 2000); // 2초 후 자동 숨김
             }
             
             await refreshList();
@@ -456,7 +507,7 @@ export default function Diary() {
         } finally {
             setSending(false);
         }
-    };
+    }, [input, sending, currentSessionType, aiChatMessages, messages, selected, canAnalyze, MIN_REQUIRED_MESSAGES, showToast, refreshList]);
 
     const onKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
         if (e.key === 'Enter' && !e.shiftKey && !(e.nativeEvent as KeyboardEvent).isComposing) {
@@ -487,12 +538,10 @@ export default function Diary() {
             }
             
             const data = await res.json();
-            console.log('🎨 Manual Analyze Response:', {
-                mood: data?.mood,
-                color: data?.mood?.color
-            });
+            if (import.meta.env.DEV) {
+                console.log('🎨 Analyze:', data?.mood);
+            }
             setMood(data?.mood ?? null);
-            setCanAnalyze(true);
             
             showToast({ 
                 message: '🎨 감정 분석이 완료되었습니다!', 
@@ -1053,6 +1102,9 @@ export default function Diary() {
                                     color={emotionOrbColor} 
                                     size={200}
                                     intensity={0.85}
+                                    analyzing={isWaitingAnalysis}
+                                    showCompleted={showCompletedAnimation}
+                                    messageCount={messageCount}
                                 />
                             </div>
                         </div>
@@ -1072,7 +1124,7 @@ export default function Diary() {
                                 }}>
                                     ✓ 감정: {mood.emotion}
                                 </div>
-                            ) : (
+                            ) : messageCount > 0 ? (
                                 <div>
                                     <div style={{ 
                                         fontSize: 11, 
@@ -1080,7 +1132,7 @@ export default function Diary() {
                                         marginBottom: 6,
                                         fontWeight: 600 
                                     }}>
-                                        진행률: {Math.min(100, Math.round((messageCount / minRequired) * 100))}%
+                                        진행률: {Math.min(100, Math.round((messageCount / MIN_REQUIRED_MESSAGES) * 100))}%
                                     </div>
                                     {/* 진행률 바 */}
                                     <div style={{ 
@@ -1092,9 +1144,9 @@ export default function Diary() {
                                         boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.1)'
                                     }}>
                                         <div style={{ 
-                                            width: `${Math.min(100, (messageCount / minRequired) * 100)}%`, 
+                                            width: `${Math.min(100, (messageCount / MIN_REQUIRED_MESSAGES) * 100)}%`, 
                                             height: '100%', 
-                                            background: messageCount >= minRequired 
+                                            background: messageCount >= MIN_REQUIRED_MESSAGES 
                                                 ? 'linear-gradient(90deg, #10b981 0%, #059669 100%)' 
                                                 : 'linear-gradient(90deg, #6366f1 0%, #8b5cf6 100%)',
                                             transition: 'width 0.5s ease',
@@ -1102,10 +1154,10 @@ export default function Diary() {
                                         }} />
                                     </div>
                                     <div style={{ fontSize: 10, color: '#9ca3af', marginTop: 4 }}>
-                                        {messageCount}/{minRequired} 메시지
+                                        {messageCount}/{MIN_REQUIRED_MESSAGES} 사용자 메시지
                                     </div>
                                 </div>
-                            )}
+                            ) : null}
                         </div>
 
                         {/* 분석 전 안내 배너 + 수동 분석 버튼 */}
@@ -1115,7 +1167,7 @@ export default function Diary() {
                                 top: 100, 
                                 left: '50%', 
                                 transform: 'translateX(-50%)', 
-                                background: messageCount >= minRequired 
+                                background: messageCount >= MIN_REQUIRED_MESSAGES 
                                     ? 'linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%)'
                                     : 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)',
                                 padding: '14px 24px',
@@ -1124,24 +1176,24 @@ export default function Diary() {
                                 zIndex: 2,
                                 fontSize: 13,
                                 fontWeight: 600,
-                                color: messageCount >= minRequired ? '#065f46' : '#92400e',
+                                color: messageCount >= MIN_REQUIRED_MESSAGES ? '#065f46' : '#92400e',
                                 display: 'flex',
                                 alignItems: 'center',
                                 gap: 12,
-                                border: messageCount >= minRequired 
+                                border: messageCount >= MIN_REQUIRED_MESSAGES 
                                     ? '2px solid #10b981'
                                     : '2px solid #fbbf24',
                                 maxWidth: '90%'
                             }}>
                                 <span style={{ fontSize: 18 }}>
-                                    {messageCount >= minRequired ? '✨' : '💭'}
+                                    {messageCount >= MIN_REQUIRED_MESSAGES ? '✨' : '💭'}
                                 </span>
                                 <div style={{ flex: 1 }}>
-                                    {messageCount >= minRequired ? (
+                                    {messageCount >= MIN_REQUIRED_MESSAGES ? (
                                         <span>충분한 대화가 쌓였어요! 감정을 분석할 수 있습니다.</span>
                                     ) : (
                                         <span>
-                                            권장: {minRequired - messageCount}개 더 대화 | 
+                                            권장: {MIN_REQUIRED_MESSAGES - messageCount}개 더 대화 | 
                                             {messageCount >= 2 ? ' 지금도 분석 가능' : ' 최소 1턴 필요'}
                                         </span>
                                     )}
@@ -1156,7 +1208,7 @@ export default function Diary() {
                                             border: 'none',
                                             background: isAnalyzing 
                                                 ? '#9ca3af'
-                                                : messageCount >= minRequired
+                                                : messageCount >= MIN_REQUIRED_MESSAGES
                                                     ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
                                                     : 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
                                             color: '#fff',

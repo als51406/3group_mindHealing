@@ -1,8 +1,8 @@
-import { memo, useEffect, useMemo, useRef } from 'react';
+import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
 import { Environment, MeshTransmissionMaterial } from '@react-three/drei';
 import * as THREE from 'three';
-import { hexToRgb, paletteFromBase } from '../utils/colorUtils';
+import { hexToRgb } from '../utils/colorUtils';
 import './EmotionOrbPremium.css';
 
 type EmotionOrbPremiumProps = {
@@ -10,6 +10,9 @@ type EmotionOrbPremiumProps = {
   size?: number;
   className?: string;
   intensity?: number;
+  analyzing?: boolean; // 감정 분석 중 상태
+  showCompleted?: boolean; // 진단 완료 표시
+  messageCount?: number; // 메시지 개수 (진단중 텍스트 표시 여부)
 };
 
 // Custom shader for minitap.ai-style liquid gradient with smooth color morphing
@@ -91,7 +94,7 @@ const liquidGradientFragmentShader = `
     float fresnel = pow(1.0 - max(dot(normal, viewDir), 0.0), 2.8);
     
     // Much faster and irregular organic movement
-    float t = uTime * 0.55;
+    float t = uTime * 0.62;
     
     // 오로라 커튼 효과 - 불규칙적이고 빠른 움직임
     // Y축은 크게, X/Z축은 작게 + 각기 다른 속도
@@ -176,39 +179,20 @@ const LiquidCore = memo(function LiquidCore({ color }: { color: string }) {
   const coreRef = useRef<THREE.Mesh>(null);
   const materialRef = useRef<THREE.ShaderMaterial>(null);
 
-  const palette = useMemo(() => paletteFromBase(color), [color]);
+  // 순수한 기본 색상만 사용 (색상 혼합 제거)
   const colors = useMemo(() => {
-    const { c1, c2, c3 } = {
-      c1: hexToRgb(palette.c1),
-      c2: hexToRgb(palette.c2),
-      c3: hexToRgb(palette.c3),
-    };
+    const base = hexToRgb(color);
+    const baseColor = new THREE.Color(base.r, base.g, base.b);
+    
     return {
-      color1: new THREE.Color(c1.r, c1.g, c1.b),
-      color2: new THREE.Color(c2.r, c2.g, c2.b),
-      color3: new THREE.Color(c3.r, c3.g, c3.b),
+      color1: baseColor,
+      color2: baseColor.clone().multiplyScalar(1.2), // 약간 밝게
+      color3: baseColor.clone().multiplyScalar(0.8), // 약간 어둡게
     };
-  }, [palette]);
-
-  // Update shader uniforms when colors change
-  useEffect(() => {
-    if (materialRef.current) {
-      materialRef.current.uniforms.uColor1.value = colors.color1.clone();
-      materialRef.current.uniforms.uColor2.value = colors.color2.clone();
-      materialRef.current.uniforms.uColor3.value = colors.color3.clone();
-      materialRef.current.needsUpdate = true;
-    }
-  }, [colors]);
+  }, [color]);
 
   useFrame(({ clock }) => {
     const t = clock.getElapsedTime();
-    
-    // More dynamic floating animation
-    // if (groupRef.current) {
-    //   groupRef.current.position.y = Math.sin(t * 0.6) * 0.1 + Math.sin(t * 0.4) * 0.05;
-    //   groupRef.current.rotation.y += 0.002; // 조금 더 빠르게 Y축 회전
-    //   groupRef.current.rotation.z = Math.sin(t * 0.5) * 0.05;
-    // }
     
     // Much faster organic rotation for dynamic aurora flow
     if (coreRef.current) {
@@ -220,15 +204,20 @@ const LiquidCore = memo(function LiquidCore({ color }: { color: string }) {
       coreRef.current.scale.setScalar(breathe);
     }
     
-    // Update time uniform
+    // Update time uniform - 항상 업데이트
     if (materialRef.current) {
       materialRef.current.uniforms.uTime.value = t;
-      // Keep colors fresh every frame
-      materialRef.current.uniforms.uColor1.value = colors.color1;
-      materialRef.current.uniforms.uColor2.value = colors.color2;
-      materialRef.current.uniforms.uColor3.value = colors.color3;
     }
   });
+  
+  // 색상 변경 시에만 uniform 업데이트 (별도 useEffect)
+  useEffect(() => {
+    if (materialRef.current) {
+      materialRef.current.uniforms.uColor1.value.copy(colors.color1);
+      materialRef.current.uniforms.uColor2.value.copy(colors.color2);
+      materialRef.current.uniforms.uColor3.value.copy(colors.color3);
+    }
+  }, [colors]);
 
   return (
     <group ref={groupRef}>
@@ -280,7 +269,7 @@ const LiquidCore = memo(function LiquidCore({ color }: { color: string }) {
           clearcoatRoughness={0.03}
           ior={1.45}
           color="#ffffff"
-          opacity={0.85}
+          opacity={0.7}
           transparent
         />
       </mesh>
@@ -312,18 +301,48 @@ const LiquidCore = memo(function LiquidCore({ color }: { color: string }) {
   );
 });
 
+// 감정 색상 배열 (emotion_colors.json의 18가지 색상)
+const EMOTION_COLORS = [
+  '#FFD54F', '#FF6B6B', '#A8E6CF', '#4DA6FF', '#8BC34A',
+  '#FFC107', '#4A90E2', '#D32F2F', '#9B59B6', '#B0BEC5',
+  '#FF6D00', '#FFB3C1', '#8D6E63', '#2E7D32', '#6D6D6D',
+  '#BDBDBD', '#C5E1A5', '#F48FB1'
+];
+
 const EmotionOrbPremium = memo(function EmotionOrbPremium({ 
   color, 
   size = 280, 
   className = '', 
-  intensity = 1 
+  intensity = 1,
+  analyzing = false,
+  showCompleted = false,
+  messageCount = 0
 }: EmotionOrbPremiumProps) {
-  console.log('🌟 EmotionOrbPremium Render:', { 
-    color, 
-    size, 
-    intensity,
-    timestamp: new Date().toISOString()
-  });
+  const [cyclingColorIndex, setCyclingColorIndex] = useState(0);
+  
+  // 진단 중일 때 색상 순환
+  useEffect(() => {
+    if (!analyzing) return;
+    
+    const interval = setInterval(() => {
+      setCyclingColorIndex((prev) => (prev + 1) % EMOTION_COLORS.length);
+    }, 1000); // 1초마다 색상 변경
+    
+    return () => clearInterval(interval);
+  }, [analyzing]);
+  
+  // 진단 중일 때는 순환 색상, 아니면 지정된 색상
+  const displayColor = analyzing ? EMOTION_COLORS[cyclingColorIndex] : color;
+  
+  // 개발 환경에서만 디버깅 로그
+  if (import.meta.env.DEV) {
+    console.log('🌟 EmotionOrbPremium:', { 
+      color,
+      displayColor,
+      analyzing,
+      cyclingIndex: analyzing ? cyclingColorIndex : '-'
+    });
+  }
   
   return (
     <div
@@ -396,7 +415,7 @@ const EmotionOrbPremium = memo(function EmotionOrbPremium({
           {/* HDR environment for realistic reflections */}
           <Environment preset="sunset" />
 
-          <LiquidCore color={color} />
+          <LiquidCore color={displayColor} />
         </Canvas>
       </div>
       
@@ -467,6 +486,72 @@ const EmotionOrbPremium = memo(function EmotionOrbPremium({
           pointerEvents: 'none',
         }}
       />
+      
+      {/* 진단 전 텍스트 오버레이 (메시지 0개일 때) */}
+      {analyzing && messageCount === 0 && (
+        <div
+          style={{
+            position: 'absolute',
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            fontSize: size * 0.1,
+            fontWeight: 700,
+            color: '#6b7280',
+            textAlign: 'center',
+            pointerEvents: 'none',
+            zIndex: 10,
+            textShadow: '0 2px 8px rgba(255,255,255,0.8)',
+            animation: 'pulse-text 1.5s ease-in-out infinite',
+          }}
+        >
+          진단전
+        </div>
+      )}
+      
+      {/* 감정 분석 중 텍스트 오버레이 (메시지 1개 이상일 때) */}
+      {analyzing && messageCount > 0 && (
+        <div
+          style={{
+            position: 'absolute',
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            fontSize: size * 0.1,
+            fontWeight: 700,
+            color: '#374151',
+            textAlign: 'center',
+            pointerEvents: 'none',
+            zIndex: 10,
+            textShadow: '0 2px 8px rgba(255,255,255,0.8)',
+            animation: 'pulse-text 1.5s ease-in-out infinite',
+          }}
+        >
+          진단중...
+        </div>
+      )}
+      
+      {/* 진단 완료 텍스트 오버레이 */}
+      {showCompleted && (
+        <div
+          style={{
+            position: 'absolute',
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            fontSize: size * 0.12,
+            fontWeight: 800,
+            color: '#10b981',
+            textAlign: 'center',
+            pointerEvents: 'none',
+            zIndex: 10,
+            textShadow: '0 2px 12px rgba(16,185,129,0.4), 0 0 20px rgba(255,255,255,0.9)',
+            animation: 'completed-text 2s ease-out forwards',
+          }}
+        >
+          진단 완료!
+        </div>
+      )}
     </div>
   );
 });
