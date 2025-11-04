@@ -275,7 +275,16 @@ export default function Diary() {
             if (aiRes.ok) {
                 const aiData: DiarySessionsApiResponse = await aiRes.json();
                 if (Array.isArray(aiData?.items)) {
-                    setList(aiData.items.map((d) => ({ ...d, _id: String(d._id) })));
+                    // lastUpdatedAt 기준 내림차순 정렬 (최신순)
+                    const sortedAiList = aiData.items
+                        .map((d) => ({ ...d, _id: String(d._id) }))
+                        .sort((a, b) => {
+                            // lastUpdatedAt 필드로 정렬 (최신 시간이 먼저)
+                            const timeA = new Date(a.lastUpdatedAt || 0).getTime();
+                            const timeB = new Date(b.lastUpdatedAt || 0).getTime();
+                            return timeB - timeA;
+                        });
+                    setList(sortedAiList);
                 }
             }
             
@@ -284,7 +293,16 @@ export default function Diary() {
             if (onlineRes.ok) {
                 const onlineData: DiarySessionsApiResponse = await onlineRes.json();
                 if (Array.isArray(onlineData?.items)) {
-                    setOnlineList(onlineData.items.map((d) => ({ ...d, _id: String(d._id) })));
+                    // lastUpdatedAt 기준 내림차순 정렬 (최신순)
+                    const sortedOnlineList = onlineData.items
+                        .map((d) => ({ ...d, _id: String(d._id) }))
+                        .sort((a, b) => {
+                            // lastUpdatedAt 필드로 정렬 (최신 시간이 먼저)
+                            const timeA = new Date(a.lastUpdatedAt || 0).getTime();
+                            const timeB = new Date(b.lastUpdatedAt || 0).getTime();
+                            return timeB - timeA;
+                        });
+                    setOnlineList(sortedOnlineList);
                 }
             }
         } catch {
@@ -390,14 +408,24 @@ export default function Diary() {
                     if (aiRes.ok) {
                         const aiData: DiarySessionsApiResponse = await aiRes.json();
                         const items: DiarySessionResponse[] = Array.isArray(aiData?.items) ? aiData.items : [];
-                        setList(items.map((d) => ({ ...d, _id: String(d._id) })));
                         
-                        if (items.length === 0) {
+                        // lastUpdatedAt 기준 내림차순 정렬 (최신순)
+                        const sortedItems = items
+                            .map((d) => ({ ...d, _id: String(d._id) }))
+                            .sort((a, b) => {
+                                // lastUpdatedAt 필드로 정렬 (최신 시간이 먼저)
+                                const timeA = new Date(a.lastUpdatedAt || 0).getTime();
+                                const timeB = new Date(b.lastUpdatedAt || 0).getTime();
+                                return timeB - timeA;
+                            });
+                        setList(sortedItems);
+                        
+                        if (sortedItems.length === 0) {
                             // 첫 세션 자동 생성
                             await createToday();
                         } else {
-                            const id = String(items[0]._id);
-                            const firstDate = items[0].date;
+                            const id = String(sortedItems[0]._id);
+                            const firstDate = sortedItems[0].date;
                             setSelected(id);
                             await loadSession(id);
                             // 첫 번째 날짜 자동으로 펼치기
@@ -410,7 +438,16 @@ export default function Diary() {
                     if (onlineRes.ok) {
                         const onlineData: DiarySessionsApiResponse = await onlineRes.json();
                         if (Array.isArray(onlineData?.items)) {
-                            setOnlineList(onlineData.items.map((d) => ({ ...d, _id: String(d._id) })));
+                            // lastUpdatedAt 기준 내림차순 정렬 (최신순)
+                            const sortedOnlineList = onlineData.items
+                                .map((d) => ({ ...d, _id: String(d._id) }))
+                                .sort((a, b) => {
+                                    // lastUpdatedAt 필드로 정렬 (최신 시간이 먼저)
+                                    const timeA = new Date(a.lastUpdatedAt || 0).getTime();
+                                    const timeB = new Date(b.lastUpdatedAt || 0).getTime();
+                                    return timeB - timeA;
+                                });
+                            setOnlineList(sortedOnlineList);
                         }
                     }
                 } catch {
