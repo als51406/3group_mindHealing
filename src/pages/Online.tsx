@@ -11,11 +11,11 @@ import './Online.css';
 export default function Online() {
 
   // 서버 주소: 개발 환경에서는 localhost, 프로덕션에서는 환경변수 사용
-  const serverLink = import.meta.env.VITE_SOCKET_SERVER_URL || "http://192.168.4.8:7780";
+  const serverLink = import.meta.env.VITE_SOCKET_SERVER_URL || "http://192.168.4.16:7780";
 
   // navigate: 페이지를 이동할 때 사용
   const navigate = useNavigate();
-  
+
   // Toast 알림
   const { showToast, ToastContainer } = useToast();
 
@@ -38,22 +38,23 @@ export default function Online() {
   // -------------------------------------- 채팅 상태 --------------------------------------
   // messages: 채팅 메시지 목록
   const [messages, setMessages] = useState<{ user: string; text: string; color: string; }[]>([]);
+  // +
+  // messagesRef: messages의 최신 값을 보관합니다.
+  const messagesRef = useRef(messages);
+  useEffect(() => { messagesRef.current = messages; }, [messages]);
 
   // input: 채팅 입력창 내용
   const [input, setInput] = useState("");
-  
-  // 다이어리 저장 중 상태
-  const [savingToDiary, setSavingToDiary] = useState(false);
+
+  // saved: 다이어리 저장 중 상태
+  const saved = useRef(true);
 
   // bottomRef: 자동 스크롤용 더미
   const bottomRef = useRef<HTMLDivElement | null>(null);
-  
-  // textareaRef: textarea 참조
-  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 
   // -------------------------------------- 서버 연동 상태 --------------------------------------
   // socket: 현재 연결된 Socket 객체
-  const [socket, setSocket] = useState<Socket | null>(null);
+  const socket = useRef<Socket | null>(null);
 
   // roomId: 서버에서 부여받은 방 ID
   const [roomId, setRoomId] = useState("");
@@ -61,6 +62,10 @@ export default function Online() {
   // -------------------------------------- 로그인 상태 확인 --------------------------------------
   // user: 사용자 정보
   const { user, loading } = useAuth();
+  // +
+  // userRef: useAuth()로 받은 user의 최신 값을 보관합니다.
+  const userRef = useRef(user);
+  useEffect(() => { userRef.current = user; }, [user]);
 
   useEffect(() => {
     // 사용자 정보 불러오는 중이면 대기
@@ -68,33 +73,15 @@ export default function Online() {
 
     // 로그인 안되있으면 로그인 페이지로 이동
     if (!user) navigate("/login");
-  }, [loading, user])
-
-  // Enter 키 전역 리스너: textarea가 포커스되지 않은 상태에서 Enter 누르면 포커스
-  useEffect(() => {
-    const handleGlobalKeyDown = (e: KeyboardEvent) => {
-      // Enter 키이고, textarea가 이미 포커스되어 있지 않으면
-      if (e.key === 'Enter' && document.activeElement !== textareaRef.current) {
-        // input, textarea, button 등이 아닌 곳에서만 동작
-        const target = e.target as HTMLElement;
-        if (target.tagName !== 'INPUT' && target.tagName !== 'TEXTAREA' && target.tagName !== 'BUTTON') {
-          e.preventDefault();
-          textareaRef.current?.focus();
-        }
-      }
-    };
-
-    window.addEventListener('keydown', handleGlobalKeyDown);
-    return () => window.removeEventListener('keydown', handleGlobalKeyDown);
-  }, []);
+  }, [loading, user, navigate])
 
   // 컴포넌트가 언마운트될 때(페이지를 벗어날 때) 실행
   useEffect(() => {
     return () => {
       // 소켓이 연결되어 있다면 서버에 접속 종료 알림
-      if (socket) {
-        socket.emit("userDisconnect");
-        socket.disconnect();
+      if (socket.current) {
+        socket.current.emit("userDisconnect");
+        socket.current.disconnect();
       }
     };
   }, [socket]);
@@ -113,7 +100,7 @@ export default function Online() {
     setMatchingMessage("당신의 마음을 읽어줄 사람을 찾는중...");
 
     // 클라이언트 -> 서버 (startMatching)
-    socket?.emit("startMatching");
+    socket.current?.emit("startMatching");
   }
 
   // --------------------------------------- 채팅 페이지 ---------------------------------------
@@ -140,66 +127,74 @@ export default function Online() {
     // 빈 칸이라면 메시지 전송 X
     if (!input.trim()) return;
 
+    // 로그인 되지 않았다면 전송 X
+    if (!user?.email) {
+      console.warn("로그인 정보가 없습니다.");
+      return;
+    }
+
     // 클라이언트 -> 서버 (chat)
-    try { socket!.emit("chat", { roomId, text: input }); }
+    try { socket.current?.emit("chat", { roomId, user: user.email, text: input }); }
     catch (error) { console.error(error); }
 
     // 입력창 비우기
     setInput("");
   }
 
-  // 다이어리에 저장
+  // saveToDiary: 다이어리에 저장
   const saveToDiary = async () => {
-    if (savingToDiary) return;
-    
+
+    // 중복 실행 방지
+    if (saved.current) return;
+    saved.current = true;
+
     // 로그인 확인
-    if (!user) {
+    if (!userRef.current) {
       showToast({ message: '로그인이 필요합니다.', type: 'warning' });
-      navigate('/login');
       return;
     }
-    
+
     // 메시지가 없으면 저장 안함
-    if (messages.length === 0) {
+    if (!messagesRef.current || messagesRef.current.length === 0) {
       showToast({ message: '저장할 대화 내용이 없습니다.', type: 'info' });
       return;
     }
-    
-    const confirmSave = confirm('현재 온라인 채팅을 다이어리에 저장하시겠습니까?');
+
+    const confirmSave = confirm('대화가 종료되었습니다.\n\n오늘의 대화를 다이어리에 기록해둘까요?');
     if (!confirmSave) return;
-    
-    setSavingToDiary(true);
-    
+
     try {
       // 1. 오늘 날짜로 온라인 채팅 세션 생성
       const today = new Date();
       const dateKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-      
+
       const createRes = await fetch('/api/diary/session', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ 
-          date: dateKey, 
+        body: JSON.stringify({
+          date: dateKey,
           type: 'online',
           title: `온라인 채팅 ${new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}`
         })
       });
-      
+
       if (!createRes.ok) {
         const errorData = await createRes.json().catch(() => ({}));
         throw new Error(errorData.message || '세션 생성 실패');
       }
-      
+
       const createData = await createRes.json();
       const sessionId = createData.id;
-      
+
+      console.log("이메일:", userRef.current?.email);
+
       // 2. 메시지 변환 (온라인 채팅 형식 → 다이어리 형식)
-      const messagesToSave = messages.map(msg => ({
-        role: (msg.user === socket?.id) ? 'user' : 'assistant',
+      const messagesToSave = messagesRef.current.map(msg => ({
+        role: (msg.user === userRef.current?.email) ? 'user' : 'assistant',
         content: msg.text
       }));
-      
+
       // 3. 메시지 저장
       const importRes = await fetch(`/api/diary/session/${sessionId}/import`, {
         method: 'POST',
@@ -207,37 +202,44 @@ export default function Online() {
         credentials: 'include',
         body: JSON.stringify({ messages: messagesToSave })
       });
-      
+
       if (!importRes.ok) {
         const errorData = await importRes.json().catch(() => ({}));
         throw new Error(errorData.message || '메시지 저장 실패');
       }
-      
+
       const importData = await importRes.json();
-      showToast({ 
-        message: `${importData.imported}개의 메시지가 다이어리에 저장되었습니다! 🎉`, 
-        type: 'success', 
-        duration: 3500 
+      showToast({
+        message: `${importData.imported}개의 메시지가 다이어리에 저장되었습니다! 🎉`,
+        type: 'success',
+        duration: 3500
       });
-      
-      // 다이어리 페이지로 이동하면서 자동으로 요약 시작
-      navigate('/diary', { 
-        state: { 
-          activeTab: 'online', 
-          sessionId: sessionId,
-          date: dateKey,
-          autoSummarize: true // 자동 요약 플래그
-        } 
-      });
-      
+
+      // 다이어리 페이지로 이동 여부 묻기
+      const goToDiary = confirm('다이어리 페이지로 이동하시겠습니까?');
+      if (goToDiary) {
+        navigate('/diary', {
+          state: {
+            activeTab: 'online',
+            sessionId: sessionId,
+            date: dateKey,
+            autoSummarize: true // 자동 요약 플래그
+          }
+        });
+      }
+
     } catch (error) {
       console.error('❌ 다이어리 저장 에러:', error);
       const errorMsg = error instanceof Error ? error.message : '다이어리 저장 중 오류가 발생했습니다.';
       showToast({ message: errorMsg, type: 'error', duration: 4000 });
-    } finally {
-      setSavingToDiary(false);
     }
   };
+
+  // 채팅이 추가될 때 마다 맨 아래로 자동 스크롤
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages])
+
   // -------------------------------------- 서버 상호작용 -시작- --------------------------------------
   useEffect(() => {
     // 서버 주소에 맞게 포트 확인 (백엔드에서 httpServer.listen(PORT)와 동일해야 함)
@@ -248,13 +250,16 @@ export default function Online() {
       upgrade: true, // polling에서 websocket으로 업그레이드
       rememberUpgrade: true, // 업그레이드 기억
     });
-    setSocket(client);
+    
+    socket.current = client;
+
+    // 서버 -> 클라이언트 (connect)
+    client.on("connect", () => {
+      console.log(`서버에 연결되었습니다: ${client.id}`);
+    });
 
     // 서버 -> 클라이언트 (matched)
     client.on("matched", (data) => {
-
-      // -log-
-      console.log(`매칭 완료: ${data}`);
 
       // 서버에서 받은 방 ID 저장
       setRoomId(data.roomId);
@@ -287,33 +292,80 @@ export default function Online() {
 
     // 서버 -> 클라이언트 (chat)
     client.on("chat", (data) => {
+
       // 채팅 메시지 배열에 서버로부터 받은 메시지 추가
       setMessages((previous) => [...previous, data])
+
+      // 다이어리 저장 가능
+      saved.current = false;
+
     });
 
     // 상대방 연결 종료 처리
     client.on("userLeft", (data) => {
+
       // 시스템 메시지로 상대방 퇴장 알림 추가
       setMessages(prev => [...prev, {
         user: 'system',
         text: data.message,
         color: '#6b7280' // 회색으로 시스템 메시지 표시
       }]);
-      showToast({ 
-        message: data.message, 
-        type: 'warning', 
-        duration: 3000 
+
+      // 토스트 알림
+      showToast({
+        message: data.message,
+        type: 'warning',
+        duration: 3000
       });
+
+      // 1초 후 자동으로 다이어리에 저장 여부 묻기
+      setTimeout(() => {
+
+        void saveToDiary();
+
+      }, 1000)
+
     });
 
+    return () => {
+
+      // 클린업 함수: 컴포넌트 언마운트 시 소켓 연결 해제
+      client.off("matched");
+      client.off("chat");
+      client.off("userLeft");
+      client.disconnect();
+
+    }
   }, []);
 
-  // 채팅이 추가될 때 마다 맨 아래로 자동 스크롤
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages])
-
   // -------------------------------------- 서버 상호작용 -끝- --------------------------------------
+
+  // ✅ 내가 먼저 페이지를 벗어날 때 (새로고침, 탭 닫기, 다른 페이지 이동 등)
+  useEffect(() => {
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      // 대화 중일 때만 다이어리 저장 시도
+      if (displayChat) {
+        void saveToDiary(); // 비동기로 저장
+        // 브라우저가 완전히 닫히는 걸 막지는 않지만, 백엔드 요청은 시도됨
+      }
+
+      // (선택) 사용자에게 "정말 떠나시겠습니까?" 경고 띄우기
+      event.preventDefault();
+      event.returnValue = '';
+    };
+
+    // 새로고침 / 탭 닫기 시 실행
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+
+      // 라우터로 페이지 이동 시 (언마운트)
+      if (displayChat) {
+        void saveToDiary();
+      }
+    };
+  }, [displayChat]);
 
   return (
     <>
@@ -326,12 +378,12 @@ export default function Online() {
               오늘, 새로운 마음을 만나보세요 💙
             </h1>
             <p style={{ fontSize: 16, color: '#6b7280', marginBottom: 40 }}>
-              당신과 같은 감정을 가진 사람과<br/>
+              당신과 같은 감정을 가진 사람과<br />
               위로와 공감을 나눠보세요
             </p>
-            
+
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-              <button 
+              <button
                 onClick={startMatching}
                 style={{
                   padding: '16px 32px',
@@ -356,8 +408,8 @@ export default function Online() {
               >
                 🤝 매칭 시작하기
               </button>
-              
-              <button 
+
+              <button
                 disabled
                 style={{
                   padding: '16px 32px',
@@ -413,10 +465,10 @@ export default function Online() {
               매칭 성공! 🎊
             </h2>
             <p style={{ fontSize: 16, color: '#6b7280', marginBottom: 40 }}>
-              당신과 같은 마음을 가진 사람을 찾았어요!<br/>
+              당신과 같은 마음을 가진 사람을 찾았어요!<br />
               곧 대화를 시작합니다...
             </p>
-            
+
             {/* 프로필 카드들 */}
             <div style={{ display: 'flex', flexDirection: 'row', justifyContent: 'center', gap: 20 }}>
               {/* 상대방 프로필 */}
@@ -425,7 +477,7 @@ export default function Online() {
                 <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 8, color: '#374151' }}>상대방</div>
                 <div style={{ fontSize: 14, color: '#6b7280' }}>당신의 파트너</div>
               </div>
-              
+
               {/* 내 프로필 */}
               <div className="profile_card">
                 <div style={{ fontSize: 48, marginBottom: 12 }}>👤</div>
@@ -441,30 +493,9 @@ export default function Online() {
       {/* <4> 챗온 채팅 페이지 -시작- */}
       {displayChat && (
         <div style={{ maxWidth: 720, margin: '0 auto', padding: '24px 16px' }}>
-          {/* 저장 버튼 헤더 */}
+
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', margin: '8px 0 16px' }}>
             <h2 style={{ textAlign: 'center', margin: 0, flex: 1 }}>온라인 채팅</h2>
-            <button
-              onClick={() => void saveToDiary()}
-              disabled={savingToDiary || messages.length === 0}
-              style={{
-                padding: '8px 16px',
-                borderRadius: 12,
-                border: '1px solid rgba(16, 185, 129, 0.5)',
-                background: savingToDiary ? 'rgba(209, 250, 229, 0.8)' : 'rgba(236, 253, 245, 0.9)',
-                backdropFilter: 'blur(10px)',
-                color: '#065f46',
-                cursor: savingToDiary || messages.length === 0 ? 'not-allowed' : 'pointer',
-                fontSize: 14,
-                fontWeight: 600,
-                opacity: messages.length === 0 ? 0.5 : 1,
-                boxShadow: messages.length > 0 ? '0 2px 8px rgba(16, 185, 129, 0.2)' : 'none',
-                transition: 'all 0.3s ease'
-              }}
-              title={messages.length === 0 ? '저장할 대화가 없습니다' : '현재 대화를 다이어리에 저장'}
-            >
-              {savingToDiary ? '저장 중...' : '📝 다이어리에 저장'}
-            </button>
           </div>
 
           <div
@@ -491,7 +522,8 @@ export default function Online() {
               {messages.map((map, i) => {
 
                 // 내 메시지인지 확인
-                const isMine = map.user === socket?.id;
+                const isMine = map.user === userRef.current?.email;
+                console.log(map.user, userRef.current?.email, isMine);
 
                 return (
                   <div key={i} style={{ display: 'flex', justifyContent: isMine ? 'flex-end' : 'flex-start', marginBottom: 8 }}>
@@ -528,7 +560,6 @@ export default function Online() {
               style={{ display: 'flex', alignItems: 'flex-end', gap: 8 }}
             >
               <textarea
-                ref={textareaRef}
                 value={input}
                 onChange={(event) => setInput(event.target.value)}
                 onKeyDown={onKeyDown}

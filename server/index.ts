@@ -1573,7 +1573,7 @@ server.on("connection", (client) => {
   // ----------------- # startMatching -끝- -----------------
 
   // 클라이언트 -> 서버 (chat): 같은 방에 있는 사람에게 메시지 전달
-  client.on("chat", async ({ roomId, text }) => {
+  client.on("chat", async ({ roomId, user, text }) => {
 
     const openai = new OpenAI({ apiKey: OPENAI_API_KEY });
 
@@ -1616,10 +1616,10 @@ server.on("connection", (client) => {
       }
     }
 
-    console.log(color);
+    console.log(`${user}: ${text}`);
 
     // 해당 room에 속한 모든 클라이언트에게 메시지 전송
-    server.to(roomId).emit("chat", { user: client.id, text, color });
+    server.to(roomId).emit("chat", { user, text, color });
   }
   );
 
@@ -1651,6 +1651,7 @@ server.on("connection", (client) => {
   });
 
 });
+
 // ------------------------- # connection -끝- -------------------------
 // ----------------------- # 실시간 1대1 매칭 -끝- -----------------------
 
