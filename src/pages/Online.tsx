@@ -47,6 +47,9 @@ export default function Online() {
 
   // bottomRef: 자동 스크롤용 더미
   const bottomRef = useRef<HTMLDivElement | null>(null);
+  
+  // textareaRef: textarea 참조
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 
   // -------------------------------------- 서버 연동 상태 --------------------------------------
   // socket: 현재 연결된 Socket 객체
@@ -66,6 +69,24 @@ export default function Online() {
     // 로그인 안되있으면 로그인 페이지로 이동
     if (!user) navigate("/login");
   }, [loading, user])
+
+  // Enter 키 전역 리스너: textarea가 포커스되지 않은 상태에서 Enter 누르면 포커스
+  useEffect(() => {
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      // Enter 키이고, textarea가 이미 포커스되어 있지 않으면
+      if (e.key === 'Enter' && document.activeElement !== textareaRef.current) {
+        // input, textarea, button 등이 아닌 곳에서만 동작
+        const target = e.target as HTMLElement;
+        if (target.tagName !== 'INPUT' && target.tagName !== 'TEXTAREA' && target.tagName !== 'BUTTON') {
+          e.preventDefault();
+          textareaRef.current?.focus();
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleGlobalKeyDown);
+    return () => window.removeEventListener('keydown', handleGlobalKeyDown);
+  }, []);
 
   // 컴포넌트가 언마운트될 때(페이지를 벗어날 때) 실행
   useEffect(() => {
@@ -509,6 +530,7 @@ export default function Online() {
               style={{ display: 'flex', alignItems: 'flex-end', gap: 8 }}
             >
               <textarea
+                ref={textareaRef}
                 value={input}
                 onChange={(event) => setInput(event.target.value)}
                 onKeyDown={onKeyDown}

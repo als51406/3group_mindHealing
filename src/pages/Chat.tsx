@@ -32,6 +32,7 @@ export default function Chat() {
     const MIN_REQUIRED_MESSAGES = 5; // 최소 요구 메시지 수
     
     const bottomRef = useRef<HTMLDivElement | null>(null); // 스크롤 맨 아래로 이동시키기 위한 참조
+    const textareaRef = useRef<HTMLTextAreaElement | null>(null); // textarea 참조
     // 이전에 변경한 바디/네비(nav) 배경을 저장해서 컴포넌트 언마운트 시 복원하기 위한 레퍼런스
     const prevBodyBgRef = useRef<string | null>(null);
     const prevNavBgRef = useRef<string | null>(null);
@@ -166,6 +167,24 @@ export default function Chat() {
             }, 300);
         }
     }, [loading, user, location.state]);
+
+    // Enter 키 전역 리스너: textarea가 포커스되지 않은 상태에서 Enter 누르면 포커스
+    useEffect(() => {
+        const handleGlobalKeyDown = (e: KeyboardEvent) => {
+            // Enter 키이고, textarea가 이미 포커스되어 있지 않으면
+            if (e.key === 'Enter' && document.activeElement !== textareaRef.current) {
+                // input, textarea, button 등이 아닌 곳에서만 동작
+                const target = e.target as HTMLElement;
+                if (target.tagName !== 'INPUT' && target.tagName !== 'TEXTAREA' && target.tagName !== 'BUTTON') {
+                    e.preventDefault();
+                    textareaRef.current?.focus();
+                }
+            }
+        };
+
+        window.addEventListener('keydown', handleGlobalKeyDown);
+        return () => window.removeEventListener('keydown', handleGlobalKeyDown);
+    }, []);
 
     // 메시지 전송 함수 (파라미터로 메시지를 받을 수 있음)
     const send = async (message?: string) => {
@@ -758,6 +777,7 @@ export default function Chat() {
                 style={{ display: 'flex', alignItems: 'flex-end', gap: 8, marginTop: 12 }}
             >
                 <textarea
+                    ref={textareaRef}
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
                     onKeyDown={onKeyDown}

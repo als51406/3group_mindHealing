@@ -85,11 +85,30 @@ export default function Diary() {
     const [pendingOnlineSessionId, setPendingOnlineSessionId] = useState<string | null>(null); // 온라인 채팅 저장 후 자동 선택할 세션 ID
     const [showWelcomeMessage, setShowWelcomeMessage] = useState<boolean>(false); // 환영 메시지 표시 여부
     const bottomRef = useRef<HTMLDivElement | null>(null);
+    const textareaRef = useRef<HTMLTextAreaElement | null>(null); // textarea 참조
 
     useEffect(() => {
         if (loading) return;
         if (!user) navigate('/login');
     }, [loading, user, navigate]);
+
+    // Enter 키 전역 리스너: textarea가 포커스되지 않은 상태에서 Enter 누르면 포커스
+    useEffect(() => {
+        const handleGlobalKeyDown = (e: KeyboardEvent) => {
+            // Enter 키이고, textarea가 이미 포커스되어 있지 않으면
+            if (e.key === 'Enter' && document.activeElement !== textareaRef.current) {
+                // input, textarea, button 등이 아닌 곳에서만 동작
+                const target = e.target as HTMLElement;
+                if (target.tagName !== 'INPUT' && target.tagName !== 'TEXTAREA' && target.tagName !== 'BUTTON') {
+                    e.preventDefault();
+                    textareaRef.current?.focus();
+                }
+            }
+        };
+
+        window.addEventListener('keydown', handleGlobalKeyDown);
+        return () => window.removeEventListener('keydown', handleGlobalKeyDown);
+    }, []);
 
     const bgStyle = useMemo(() => {
         const c = mood?.color || '#f4f4f5';
@@ -1341,6 +1360,7 @@ export default function Diary() {
 
                         <form onSubmit={(e) => { e.preventDefault(); void send(); }} style={{ display: 'flex', alignItems: 'flex-end', gap: 8, marginTop: 12 }}>
                             <textarea
+                                ref={textareaRef}
                                 value={input}
                                 onChange={(e) => setInput(e.target.value)}
                                 onKeyDown={onKeyDown}
@@ -1503,6 +1523,7 @@ export default function Diary() {
                             
                             <form onSubmit={(e) => { e.preventDefault(); void send(); }} style={{ display: 'flex', alignItems: 'flex-end', gap: 10, flexShrink: 0 }}>
                                 <textarea
+                                    ref={textareaRef}
                                     value={input}
                                     onChange={(e) => setInput(e.target.value)}
                                     onKeyDown={onKeyDown}
