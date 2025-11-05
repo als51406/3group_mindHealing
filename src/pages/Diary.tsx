@@ -97,6 +97,7 @@ export default function Diary() {
     const [onlineList, setOnlineList] = useState<DiaryListItem[]>([]); // 온라인 채팅 목록
     const [selected, setSelected] = useState<string>(''); // 선택된 세션 ID
     const [selectedDate, setSelectedDate] = useState<string>(todayKey());
+    const [isToday, setIsToday] = useState<boolean>(true); // 선택된 날짜가 오늘인지 여부
     const [messages, setMessages] = useState<DiaryMessage[]>([]);
     const [onlineOriginalMessages, setOnlineOriginalMessages] = useState<DiaryMessage[]>([]); // 온라인 채팅 원본 메시지 (읽기 전용)
     const [aiChatMessages, setAiChatMessages] = useState<DiaryMessage[]>([]); // 온라인 채팅 탭의 AI와의 대화
@@ -403,6 +404,12 @@ export default function Diary() {
             }
             setMood(sessionMood);
             setSelectedDate(String(data?.session?.date || todayKey()));
+            
+            // 오늘 날짜인지 체크
+            const sessionDate = String(data?.session?.date || todayKey());
+            const today = todayKey();
+            setIsToday(sessionDate === today);
+            
             await refreshList();
         } catch {}
         finally { setLoadingDiary(false); }
@@ -657,6 +664,17 @@ export default function Diary() {
     const send = useCallback(async () => {
         const text = input.trim();
         if (!text || sending) return;
+        
+        // 과거 날짜 체크
+        if (!isToday) {
+            showToast({ 
+                message: '🔒 과거 대화는 수정할 수 없습니다. 오늘 날짜의 대화만 작성 가능합니다.', 
+                type: 'error',
+                duration: 4000
+            });
+            return;
+        }
+        
         setSending(true);
         setShowWelcomeMessage(false); // 첫 메시지 입력 시 환영 메시지 숨김
         
@@ -786,7 +804,7 @@ export default function Diary() {
         } finally {
             setSending(false);
         }
-    }, [input, sending, currentSessionType, aiChatMessages, messages, selected, canAnalyze, MIN_REQUIRED_MESSAGES, showToast, refreshList]);
+    }, [input, sending, isToday, currentSessionType, aiChatMessages, messages, selected, canAnalyze, MIN_REQUIRED_MESSAGES, showToast, refreshList]);
 
     const onKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
         if (e.key === 'Enter' && !e.shiftKey && !(e.nativeEvent as KeyboardEvent).isComposing) {
@@ -952,6 +970,8 @@ export default function Diary() {
                 const data = await res.json();
                 const id = String(data?.id);
                 setSelected(id);
+                setSelectedDate(today);
+                setIsToday(true); // 새 대화는 항상 오늘
                 setShowWelcomeMessage(true); // 새 대화 생성 시 환영 메시지 표시
                 await loadSession(id);
                 // 새 대화가 추가된 날짜를 자동으로 펼치기
@@ -1711,6 +1731,35 @@ export default function Diary() {
                         </div>
 
                         <div className="diary-chat-area" style={{ border: '1px solid #e5e7eb', borderRadius: 12, height: '55vh', maxHeight: '55vh', padding: 12, overflowY: 'auto', background: 'rgba(255,255,255,0.75)', width: 'min(100%, 1200px)', margin: '150px auto 0', boxSizing: 'border-box', position: 'relative' }}>
+                            {/* 과거 날짜 경고 오버레이 */}
+                            {!isToday && (
+                                <div style={{
+                                    position: 'absolute',
+                                    top: 0,
+                                    left: 0,
+                                    right: 0,
+                                    padding: '12px 16px',
+                                    background: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)',
+                                    border: '2px solid #f59e0b',
+                                    borderRadius: '12px 12px 0 0',
+                                    zIndex: 5,
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: 12,
+                                    boxShadow: '0 2px 8px rgba(245, 158, 11, 0.2)'
+                                }}>
+                                    <span style={{ fontSize: 24 }}>🔒</span>
+                                    <div style={{ flex: 1 }}>
+                                        <div style={{ fontSize: 14, fontWeight: 700, color: '#92400e', marginBottom: 2 }}>
+                                            과거 대화는 수정할 수 없습니다
+                                        </div>
+                                        <div style={{ fontSize: 12, color: '#78350f' }}>
+                                            일기의 본질을 지키기 위해 과거 기록은 조회만 가능합니다. 삭제는 가능합니다.
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                            
                             {/* 환영 메시지 오버레이 (AI 탭에서만) */}
                             {activeTab === 'ai' && showWelcomeMessage && messages.length === 0 && (
                                 <div style={{
@@ -1748,7 +1797,9 @@ export default function Diary() {
                             {loadingDiary ? (
                                 <ChatLoadingSkeleton />
                             ) : (
-                                messages.map(Bubble)
+                                <div style={{ paddingTop: !isToday ? '70px' : '0' }}>
+                                    {messages.map(Bubble)}
+                                </div>
                             )}
                             <div ref={bottomRef} />
                         </div>
@@ -1759,12 +1810,33 @@ export default function Diary() {
                                 value={input}
                                 onChange={(e) => setInput(e.target.value)}
                                 onKeyDown={onKeyDown}
-                                placeholder="오늘의 생각을 적어보세요. Enter로 전송 (Shift+Enter 줄바꿈)"
+                                placeholder={isToday ? "오늘의 생각을 적어보세요. Enter로 전송 (Shift+Enter 줄바꿈)" : "📌 과거 대화는 수정할 수 없습니다. 조회만 가능합니다."}
                                 rows={2}
-                                style={{ flex: 1, padding: 10, border: '1px solid #e5e7eb', borderRadius: 8, resize: 'vertical', background: '#fff' }}
+                                disabled={!isToday}
+                                style={{ 
+                                    flex: 1, 
+                                    padding: 10, 
+                                    border: isToday ? '1px solid #e5e7eb' : '1px solid #d1d5db', 
+                                    borderRadius: 8, 
+                                    resize: 'vertical', 
+                                    background: isToday ? '#fff' : '#f3f4f6',
+                                    color: isToday ? '#000' : '#9ca3af',
+                                    cursor: isToday ? 'text' : 'not-allowed'
+                                }}
                             />
-                            <button type="submit" disabled={sending || !input.trim()} style={{ padding: '10px 14px', borderRadius: 8, border: '1px solid #2563eb', background: sending ? '#93c5fd' : '#2563eb', color: '#fff', cursor: sending ? 'not-allowed' : 'pointer' }}>
-                                {sending ? '전송중…' : '전송'}
+                            <button 
+                                type="submit" 
+                                disabled={sending || !input.trim() || !isToday} 
+                                style={{ 
+                                    padding: '10px 14px', 
+                                    borderRadius: 8, 
+                                    border: isToday ? '1px solid #2563eb' : '1px solid #9ca3af', 
+                                    background: !isToday ? '#e5e7eb' : (sending ? '#93c5fd' : '#2563eb'), 
+                                    color: !isToday ? '#6b7280' : '#fff', 
+                                    cursor: (!isToday || sending) ? 'not-allowed' : 'pointer' 
+                                }}
+                            >
+                                {!isToday ? '🔒' : (sending ? '전송중…' : '전송')}
                             </button>
                         </form>
                         </div>
