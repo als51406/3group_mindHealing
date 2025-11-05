@@ -224,7 +224,7 @@ export default function OrbShowcase() {
               )}
               {selectedOrb === 'siri' && (
                 <div style={{ width: '100%', height: '100%' }}>
-                  <SiriOrb />
+                  <SiriOrb color={selectedColor} intensity={intensity} />
                 </div>
               )}
             </div>

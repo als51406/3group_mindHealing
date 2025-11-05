@@ -38,8 +38,6 @@ export default function Chat() {
     const prevBodyBgRef = useRef<string | null>(null);
     const prevNavBgRef = useRef<string | null>(null);
     const navChangedRef = useRef(false);
-    // Home에서 전달된 초기 메시지를 한 번만 처리하기 위한 ref
-    const initialMessageProcessed = useRef(false);
 
     // 채팅 기록 불러오기 (컴포넌트 처음 렌더링 시 1회 실행)
     useEffect(() => {
@@ -72,30 +70,7 @@ export default function Chat() {
                 // 실패 시 조용히 무시 (에러 메시지 노출 안 함)
             }
         })();
-    }, [location.state]); // location.state 의존성 추가
-
-    // 컴포넌트 언마운트 시(또는 재렌더에 의해 cleanup이 필요할 때) 바디와 네비게이션 배경을 복원
-    useEffect(() => {
-        return () => {
-            try {
-                if (prevBodyBgRef.current !== null) {
-                    document.body.style.backgroundColor = prevBodyBgRef.current || '';
-                    prevBodyBgRef.current = null;
-                }
-                if (navChangedRef.current) {
-                    const nav = document.querySelector('nav') as HTMLElement | null;
-                    if (nav) {
-                        // 복원할 이전 inline 스타일이 있다면 복원, 없으면 빈 문자열로 초기화
-                        nav.style.backgroundColor = prevNavBgRef.current || '';
-                    }
-                    prevNavBgRef.current = null;
-                    navChangedRef.current = false;
-                }
-            } catch {
-                // DOM 관련 문제 발생 시 무시
-            }
-        };
-    }, []);
+    }, []); // 마운트 시 한 번만 실행
 
     // 문자열에서 { ... } 형태의 JSON 제거
     const removeJsonFromContent = (content: string) => {
@@ -156,49 +131,9 @@ export default function Chat() {
         bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, [msgs]);
 
-    // Home에서 전달된 초기 메시지를 자동으로 전송
-    useEffect(() => {
-        // 로그인 확인이 완료되고, 사용자가 있고, 아직 처리하지 않았으면
-        if (loading || !user || initialMessageProcessed.current) return;
-        
-        // location.state에서 initialMessage 추출
-        const state = location.state as { initialMessage?: string } | null;
-        const initialMessage = state?.initialMessage;
-        
-        // 초기 메시지가 있으면 자동으로 전송
-        if (initialMessage && initialMessage.trim()) {
-            initialMessageProcessed.current = true; // 한 번만 실행되도록 표시
-            // 약간의 딜레이를 주어 UI가 안정화된 후 전송
-            setTimeout(() => {
-                setInput(initialMessage);
-                setTimeout(() => {
-                    void send(initialMessage);
-                }, 100);
-            }, 300);
-        }
-    }, [loading, user, location.state]);
-
-    // Enter 키 전역 리스너: textarea가 포커스되지 않은 상태에서 Enter 누르면 포커스
-    useEffect(() => {
-        const handleGlobalKeyDown = (e: KeyboardEvent) => {
-            // Enter 키이고, textarea가 이미 포커스되어 있지 않으면
-            if (e.key === 'Enter' && document.activeElement !== textareaRef.current) {
-                // input, textarea, button 등이 아닌 곳에서만 동작
-                const target = e.target as HTMLElement;
-                if (target.tagName !== 'INPUT' && target.tagName !== 'TEXTAREA' && target.tagName !== 'BUTTON') {
-                    e.preventDefault();
-                    textareaRef.current?.focus();
-                }
-            }
-        };
-
-        window.addEventListener('keydown', handleGlobalKeyDown);
-        return () => window.removeEventListener('keydown', handleGlobalKeyDown);
-    }, []);
-
-    // 메시지 전송 함수 (파라미터로 메시지를 받을 수 있음)
-    const send = async (message?: string) => {
-        const prompt = (message || input).trim(); // 파라미터가 있으면 사용, 없으면 input 사용
+    // 메시지 전송 함수
+    const send = async () => {
+        const prompt = input.trim(); // 공백 제거
         if (!prompt || sending) return; // 입력이 비어 있거나 이미 전송 중이면 무시
 
         setSending(true);

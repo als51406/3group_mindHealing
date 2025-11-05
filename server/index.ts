@@ -330,12 +330,12 @@ app.post('/api/ai/chat', authMiddleware, async (req: any, res) => {
       return res.status(400).json({ message: 'messages 배열이 필요합니다.' });
     }
     const openai = new OpenAI({ apiKey: OPENAI_API_KEY });
-    const resp = await chatCompletionWithFallback(
+  const resp = await chatCompletionWithFallback(
       openai,
       messages.map((m: any) => ({ role: m.role, content: String(m.content) })),
       model
     );
-    const content = resp.choices?.[0]?.message?.content ?? '';
+  const content = (resp as any)?.choices?.[0]?.message?.content ?? '';
     // persist user last message + assistant reply
     try {
       const client = await getClient();
@@ -346,12 +346,13 @@ app.post('/api/ai/chat', authMiddleware, async (req: any, res) => {
         await db.collection('ai_messages').insertOne({ userId, role: 'user', content: String(last.content || ''), createdAt: new Date() });
       }
       await db.collection('ai_messages').insertOne({ userId, role: 'assistant', content, createdAt: new Date() });
-    } catch (persistErr) {
+      } catch (persistErr) {
       console.warn('persist ai_messages failed:', (persistErr as Error).message);
     }
-    res.json({ ok: true, content });
-  } catch (e: any) {
-    console.error('AI chat error:', e?.message || e);
+    // respond to the client with the assistant content
+    return res.json({ ok: true, content });
+  } catch (e: unknown) {
+    console.error('AI chat error:', e instanceof Error ? e.message : String(e));
     res.status(500).json({ message: 'AI 응답 생성 중 오류' });
   }
 });

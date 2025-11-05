@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, Component } from 're
 import type { ReactNode } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
-import EmotionOrbPremium from '../components/EmotionOrbPremium';
+import SiriOrb from '../components/SiriOrb';
 import ColorCircle from '../components/ColorCircle';
 import { useToast } from '../components/Toast';
 import { ChatLoadingSkeleton, DiaryListSkeleton } from '../components/Skeleton';
@@ -1587,8 +1587,8 @@ export default function Diary() {
                                 {/* 감정 오브: 채팅창 왼쪽 상단 고정, 크게 */}
                                 <div style={{
                                     position: 'absolute',
-                                    top: -10,
-                                    left: -10,
+                                    top: -25,
+                                    left: 30,
                                     zIndex: 20,
                                     pointerEvents: 'none',
                                     width: 200,
@@ -1603,10 +1603,11 @@ export default function Diary() {
                                         display: 'flex',
                                         alignItems: 'center',
                                         justifyContent: 'center',
-                                        transformOrigin: 'center center'
+                                        transformOrigin: 'center center',
+                                        filter: 'drop-shadow(0 0 8px rgba(0, 0, 0, 0.3)) drop-shadow(0 2px 16px rgba(0, 0, 0, 0.2))'
                                     }}>
                                         <WebGLErrorBoundary>
-                                            <EmotionOrbPremium
+                                            <SiriOrb
                                                 color={emotionOrbColor}
                                                 size={200}
                                                 intensity={0.85}
@@ -1795,7 +1796,7 @@ export default function Diary() {
                                     <div className="diary_chat_area">
 
                                         {/* 채팅 로그 */}
-                                        <div className="diary_chat_log" style={{ border: '1px solid #e5e7eb', borderRadius: 12, height: '55vh', maxHeight: '55vh', padding: 12, overflowY: 'auto', background: 'rgba(255,255,255,0.75)', margin: '150px 0 0', boxSizing: 'border-box', position: 'relative' }}>
+                                        <div className="diary_chat_log" style={{ border: '1px solid #e5e7eb', borderRadius: 12, height: '55vh', maxHeight: '55vh', padding: 12, overflowY: 'auto', background: 'rgba(255,255,255,0.75)', margin: '15vh 0 0', boxSizing: 'border-box', position: 'relative' }}>
 
                                             {/* 과거 날짜 경고 오버레이 */}
                                             {!isToday && (

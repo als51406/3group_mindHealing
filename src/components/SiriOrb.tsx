@@ -2,7 +2,7 @@
 import React, { useRef, useMemo } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
 import * as THREE from "three";
-import { EffectComposer, Bloom } from "@react-three/postprocessing";
+import './EmotionOrbPremium.css'; // CSS 공유
 
 /* ───────────── Siri 실크 리본 쉐이더 ───────────── */
 const createSiriRibbonShader = (phase: number, color1: THREE.Color, color2: THREE.Color) => ({
@@ -52,25 +52,25 @@ const createSiriRibbonShader = (phase: number, color1: THREE.Color, color2: THRE
       vec3 viewDir = normalize(vPos);
       float fresnel = pow(1.0 - abs(dot(vNormal, viewDir)), 2.5);
 
-      // 🎨 색감 강화 - 하얗지 않게
+      // 🎨 색상 위주, 실크 효과 최소화
       vec3 color = mix(uColor1, uColor2, smoothstep(-0.3, 0.7, vPos.y));
-      color *= 2.0; // 색상 강도 대폭 증가
+      color *= 2.9; // 색상 강도
       
-      // Fresnel로 엣지 강조
-      color += fresnel * 0.3;
+      // 미세한 Fresnel 엣지 광택만
+      color += fresnel * 0.2;
 
-      // 중앙은 덜 밝게, 엣지는 더 밝게
+      // 중앙과 엣지 밝기로 입체감 표현
       float dist = length(vPos);
-      float centerGlow = pow(1.0 - smoothstep(0.0, 0.6, dist), 1.5);
-      float edgeGlow = pow(1.0 - smoothstep(0.4, 1.0, dist), 2.5);
+      float centerShade = pow(1.0 - smoothstep(0.0, 0.6, dist), 1.5);
+      float edgeHighlight = pow(1.0 - smoothstep(0.4, 1.0, dist), 2.5);
       
-      vec3 finalColor = color * (0.8 + centerGlow * 0.2 + edgeGlow * 1.0);
+      vec3 finalColor = color * (0.62 + centerShade * 0.12 + edgeHighlight * 0.75);
 
-      // Rim으로 입체감
+      // 아주 미세한 Rim 광택
       float rim = pow(1.0 - abs(dot(vNormal, vec3(0.0, 0.0, 1.0))), 2.5);
-      finalColor += color * rim * 0.2;
+      finalColor += color * rim * 0.12;
 
-      gl_FragColor = vec4(finalColor, 0.9);
+      gl_FragColor = vec4(finalColor, 0.90); // 약간 더 불투명
     }
   `,
 });
@@ -121,7 +121,7 @@ const InnerSilkRibbon: React.FC<InnerSilkRibbonProps> = ({
         args={[shaderRef]}
         transparent
         side={THREE.DoubleSide}
-        blending={THREE.AdditiveBlending}
+        blending={THREE.AdditiveBlending}  // 다시 AdditiveBlending으로 실크 광택 효과
         depthWrite={false}
         depthTest={false}
       />
@@ -129,24 +129,34 @@ const InnerSilkRibbon: React.FC<InnerSilkRibbonProps> = ({
   );
 };
 
-/* ───────────── Glass Orb ───────────── */
-const GlassOrb: React.FC = () => {
+/* ───────────── Glass Orb (미사용) ───────────── */
+/*
+interface GlassOrbProps {
+  emotionColor: string;
+}
+
+const GlassOrb: React.FC<GlassOrbProps> = ({ emotionColor }) => {
   const meshRef = useRef<THREE.Mesh>(null);
 
   useFrame(({ clock }) => {
     const t = clock.getElapsedTime();
     if (meshRef.current && meshRef.current.material instanceof THREE.MeshPhysicalMaterial) {
-      // 오로라 색상 변화 (부드럽게 순환)
-      const hue = (t * 0.08) % 1.0; // 천천히 색상 순환
-      const saturation = 0.7 + Math.sin(t * 0.4) * 0.2;
-      const lightness = 0.65 + Math.sin(t * 0.25) * 0.15;
+      // 감정 색상을 기반으로 한 오로라 효과
+      const baseColor = new THREE.Color(emotionColor);
+      const hsl = { h: 0, s: 0, l: 0 };
+      baseColor.getHSL(hsl);
+      
+      // 시간에 따라 색조를 약간 변화시켜 오로라 효과
+      const hue = (hsl.h + Math.sin(t * 0.3) * 0.08) % 1.0;
+      const saturation = Math.min(hsl.s * 1.4, 1.0) + Math.sin(t * 0.4) * 0.08;
+      const lightness = 0.25 + Math.sin(t * 0.25) * 0.08; // 더 어둡게 조정
       
       // HSL to RGB 변환으로 오로라 효과
       const color = new THREE.Color().setHSL(hue, saturation, lightness);
       meshRef.current.material.attenuationColor = color;
       
-      // 살짝 투명도도 변화
-      meshRef.current.material.opacity = 0.12 + Math.sin(t * 0.3) * 0.03;
+      // 투명도를 더 높여서 내부 리본 색상이 잘 보이도록
+      meshRef.current.material.opacity = 0.18 + Math.sin(t * 0.3) * 0.05;
     }
   });
 
@@ -154,24 +164,25 @@ const GlassOrb: React.FC = () => {
     <mesh ref={meshRef} scale={0.58} renderOrder={3}>
       <sphereGeometry args={[1, 256, 256]} />
       <meshPhysicalMaterial
-        transmission={0.85}
-        thickness={0.1}
-        roughness={0.03}
-        clearcoat={1}
-        clearcoatRoughness={0.08}
-        reflectivity={0.9}
-        ior={1.4}
-        color="#ffffff"
-        attenuationColor="#c8b8ff"
-        attenuationDistance={2.5}
+        transmission={0.85}  // 투과율 증가
+        thickness={0.10}     // 두께 감소
+        roughness={0.03}     
+        clearcoat={0.55}     // 코팅 감소
+        clearcoatRoughness={0.20}
+        reflectivity={0.45}  
+        ior={1.32}
+        color={emotionColor}
+        attenuationColor={emotionColor}
+        attenuationDistance={1.4}
         transparent
-        opacity={0.12}
+        opacity={0.18}       // 불투명도 감소
         side={THREE.FrontSide}
         depthWrite={false}
       />
     </mesh>
   );
 };
+*/
 
 /* ───────────── Starburst Ray Shader (미사용) ───────────── */
 /*
@@ -228,28 +239,30 @@ const StarburstRay: React.FC<{ angle: number; length: number; thickness?: number
 */
 
 /* ───────────── Starburst Light ───────────── */
-const StarburstLight: React.FC = () => {
+interface StarburstLightProps {
+  emotionColor: string;
+}
+
+const StarburstLight: React.FC<StarburstLightProps> = ({ emotionColor }) => {
   const coreRef = useRef<THREE.Mesh>(null);
 
   useFrame(({ clock }) => {
     const t = clock.getElapsedTime();
     if (coreRef.current && coreRef.current.material instanceof THREE.MeshStandardMaterial) {
-      coreRef.current.material.emissiveIntensity = 0.1 + Math.sin(t * 4.0) * 0.05;
+      // 발광 효과 제거, 스케일 애니메이션만 유지
       coreRef.current.scale.setScalar(1 + Math.sin(t * 2.5) * 0.03);
     }
   });
 
   return (
     <group renderOrder={0}>
-      {/* 중앙 코어 - 더 어둡게 */}
+      {/* 중앙 코어 - 발광 효과 없이 순수 색상만 */}
       <mesh ref={coreRef} renderOrder={0}>
         <sphereGeometry args={[0.08, 64, 64]} />
         <meshStandardMaterial
-          emissive="#c8b0ff"
-          color="#f0e0ff"
-          emissiveIntensity={0.1}
+          color={emotionColor}
           transparent
-          opacity={0.3}
+          opacity={0.5}
         />
       </mesh>
     </group>
@@ -257,45 +270,144 @@ const StarburstLight: React.FC = () => {
 };
 
 /* ───────────── Scene ───────────── */
-export default function SiriOrb() {
+interface SiriOrbProps {
+  color?: string;  // 감정 색상
+  intensity?: number;
+  size?: number;  // 오브 크기
+  className?: string;  // CSS 클래스
+  analyzing?: boolean;  // 감정 분석 중 상태
+  showCompleted?: boolean;  // 진단 완료 표시
+  messageCount?: number;  // 메시지 개수 (진단중 텍스트 표시 여부)
+}
+
+export default function SiriOrb({ 
+  color = '#9d00ff', 
+  intensity = 1,
+  size = 400,
+  className = '',
+  analyzing = false,
+  showCompleted = false,
+  messageCount = 0
+}: SiriOrbProps) {
+  // 색상을 HSL로 변환하여 보색과 유사색 생성
+  const baseColor = new THREE.Color(color);
+  const hsl = { h: 0, s: 0, l: 0 };
+  baseColor.getHSL(hsl);
+  
+  // 채도를 높이고 밝기를 낮춰서 색상이 더 선명하게 보이도록 조정
+  const enhancedSaturation = Math.min(hsl.s * 1.4, 1.0); // 채도 40% 증가
+  const reducedLightness = Math.max(hsl.l * 0.45, 0.25); // 밝기 55% 감소 (최소 0.25)
+  
+  // 8가지 색상 변형 생성 (더 진하고 선명하게)
+  const colors = [
+    new THREE.Color().setHSL(hsl.h, enhancedSaturation * 0.9, reducedLightness * 0.85).getStyle(),  // 어둡게
+    new THREE.Color().setHSL((hsl.h + 0.08) % 1, enhancedSaturation * 0.95, reducedLightness * 0.9).getStyle(),  // 약간 다른 색조
+    new THREE.Color().setHSL((hsl.h + 0.12) % 1, enhancedSaturation, reducedLightness).getStyle(),  // 기본
+    new THREE.Color().setHSL((hsl.h - 0.08 + 1) % 1, enhancedSaturation * 0.85, reducedLightness * 0.95).getStyle(),  // 반대 방향
+    new THREE.Color().setHSL(hsl.h, enhancedSaturation * 1.05, reducedLightness * 1.05).getStyle(),  // 채도 높게
+    new THREE.Color().setHSL((hsl.h + 0.15) % 1, enhancedSaturation * 0.95, reducedLightness * 0.92).getStyle(),  // 보색 방향
+    new THREE.Color().setHSL((hsl.h - 0.12 + 1) % 1, enhancedSaturation * 0.88, reducedLightness * 0.88).getStyle(),  // 어두운 변형
+    new THREE.Color().setHSL((hsl.h + 0.05) % 1, enhancedSaturation, reducedLightness * 0.93).getStyle(),  // 미세 조정
+  ];
+
+  // 보색 계산 (180도 반대) - 마찬가지로 선명하게
+  const complementaryHue = (hsl.h + 0.5) % 1;
+  const complementaryColors = colors.map((_, i) => 
+    new THREE.Color().setHSL(
+      (complementaryHue + (i * 0.05)) % 1, 
+      enhancedSaturation * 0.9, 
+      reducedLightness * 0.9
+    ).getStyle()
+  );
+
   return (
     <div
-      className="stage"
+      className={`siri-orb-container ${className}`}
       style={{
-        width: "100%",
-        height: "100%",
-        minHeight: "600px",
-        background: "radial-gradient(circle at center, #0a0814 0%, #050509 50%, #000 100%)",
-        overflow: "hidden",
+        position: 'relative',
+        width: `${size}px`,
+        height: `${size}px`,
+        minHeight: `${size}px`,
       }}
     >
-      <Canvas camera={{ position: [0, 0, 2.8], fov: 40 }}>
-        <ambientLight intensity={0.08} />
-        <directionalLight position={[5, 5, 5]} intensity={0.2} color="#ffffff" />
+      <div
+        className="stage"
+        style={{
+          width: "100%",
+          height: "100%",
+          background: "transparent",
+          overflow: "hidden",
+          borderRadius: '50%',
+        }}
+      >
+        <Canvas 
+          camera={{ position: [0, 0, 2.8], fov: 40 }}
+          gl={{ alpha: true, antialias: true, preserveDrawingBuffer: true }}
+          style={{ background: 'transparent' }}
+        >
+          <ambientLight intensity={0.04 * intensity} />
+          <directionalLight position={[5, 5, 5]} intensity={0.10 * intensity} color="#ffffff" />
 
-        <StarburstLight />
+          <StarburstLight emotionColor={color} />
 
-        {/* 🎨 색감 강화 - 진한 색상 */}
-        <InnerSilkRibbon phase={0.0} color1="#ff0077" color2="#9d00ff" scale={0.56} speed={2.4} axis={[1, 0.5, 0.2]} />
-        <InnerSilkRibbon phase={0.9} color1="#00ff99" color2="#00e5ff" scale={0.54} speed={3.2} axis={[0.3, 1, 0.4]} />
-        <InnerSilkRibbon phase={1.8} color1="#ff6600" color2="#ff0055" scale={0.52} speed={2.8} axis={[0.4, 0.2, 1]} />
-        <InnerSilkRibbon phase={2.7} color1="#4488ff" color2="#9d00ff" scale={0.50} speed={3.6} axis={[1, 0.3, 0.7]} />
-        <InnerSilkRibbon phase={3.6} color1="#dd55ff" color2="#00ff77" scale={0.48} speed={3.0} axis={[0.5, 0.8, 0.3]} />
-        <InnerSilkRibbon phase={4.5} color1="#00ddff" color2="#ff0088" scale={0.46} speed={3.4} axis={[0.7, 0.4, 0.9]} />
-        <InnerSilkRibbon phase={5.4} color1="#ff00ff" color2="#00ffaa" scale={0.44} speed={2.6} axis={[0.6, 0.7, 0.5]} />
-        <InnerSilkRibbon phase={6.3} color1="#ffbb00" color2="#5588ff" scale={0.42} speed={3.8} axis={[0.8, 0.3, 0.6]} />
+          {/* 🎨 감정 색상 기반 리본 */}
+          <InnerSilkRibbon phase={0.0} color1={colors[0]} color2={complementaryColors[0]} scale={0.56} speed={analyzing ? 3.6 : 2.4} axis={[1, 0.5, 0.2]} />
+          <InnerSilkRibbon phase={0.9} color1={colors[1]} color2={complementaryColors[1]} scale={0.54} speed={analyzing ? 4.8 : 3.2} axis={[0.3, 1, 0.4]} />
+          <InnerSilkRibbon phase={1.8} color1={colors[2]} color2={complementaryColors[2]} scale={0.52} speed={analyzing ? 4.2 : 2.8} axis={[0.4, 0.2, 1]} />
+          <InnerSilkRibbon phase={2.7} color1={colors[3]} color2={complementaryColors[3]} scale={0.50} speed={analyzing ? 5.4 : 3.6} axis={[1, 0.3, 0.7]} />
+          <InnerSilkRibbon phase={3.6} color1={colors[4]} color2={complementaryColors[4]} scale={0.48} speed={analyzing ? 4.5 : 3.0} axis={[0.5, 0.8, 0.3]} />
+          <InnerSilkRibbon phase={4.5} color1={colors[5]} color2={complementaryColors[5]} scale={0.46} speed={analyzing ? 5.1 : 3.4} axis={[0.7, 0.4, 0.9]} />
+          <InnerSilkRibbon phase={5.4} color1={colors[6]} color2={complementaryColors[6]} scale={0.44} speed={analyzing ? 3.9 : 2.6} axis={[0.6, 0.7, 0.5]} />
+          <InnerSilkRibbon phase={6.3} color1={colors[7]} color2={complementaryColors[7]} scale={0.42} speed={analyzing ? 5.7 : 3.8} axis={[0.8, 0.3, 0.6]} />
 
-        <GlassOrb />
+          {/* GlassOrb 제거 - 실크 리본만 표시 */}
+        </Canvas>
+      </div>
 
-        <EffectComposer>
-          <Bloom
-            intensity={0.2}
-            luminanceThreshold={0.75}
-            luminanceSmoothing={0.95}
-            radius={0.45}
-          />
-        </EffectComposer>
-      </Canvas>
+      {/* 진단중 텍스트 */}
+      {analyzing && messageCount >= 1 && (
+        <div
+          style={{
+            position: 'absolute',
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            fontSize: size * 0.08,
+            fontWeight: 700,
+            color: '#fff',
+            textAlign: 'center',
+            pointerEvents: 'none',
+            zIndex: 10,
+            textShadow: '0 2px 8px rgba(0,0,0,0.5)',
+            animation: 'analyzing-pulse 1.5s ease-in-out infinite',
+          }}
+        >
+          진단중
+          <span style={{ animation: 'dots 1.5s steps(4, end) infinite' }}>...</span>
+        </div>
+      )}
+
+      {/* 진단 완료 텍스트 */}
+      {showCompleted && (
+        <div
+          style={{
+            position: 'absolute',
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            fontSize: size * 0.12,
+            fontWeight: 800,
+            color: '#10b981',
+            textAlign: 'center',
+            pointerEvents: 'none',
+            zIndex: 10,
+            textShadow: '0 2px 12px rgba(16,185,129,0.4), 0 0 20px rgba(255,255,255,0.9)',
+            animation: 'completed-text 2s ease-out forwards',
+          }}
+        >
+          진단 완료!
+        </div>
+      )}
     </div>
   );
 }
