@@ -1,14 +1,32 @@
 // History.tsx - 감정 히스토리 전용 페이지
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import EmotionHistoryChart from '../components/EmotionHistoryChart';
 import EmotionInsights from '../components/EmotionInsights';
+import EmotionTitle from '../components/EmotionTitle';
+import EmotionTopFive from '../components/EmotionTopFive';
+
+const CACHE_KEY = 'emotion_title_cache';
 
 export default function History() {
   const navigate = useNavigate();
   const { user, loading } = useAuth();
   const [chartDays, setChartDays] = useState(7);
+  const [userTitle, setUserTitle] = useState('');
+
+  // 캐시된 칭호 로드
+  useEffect(() => {
+    const cached = localStorage.getItem(CACHE_KEY);
+    if (cached) {
+      try {
+        const { title } = JSON.parse(cached);
+        setUserTitle(title);
+      } catch (e) {
+        // 캐시 파싱 오류 시 무시
+      }
+    }
+  }, []);
 
   // 인증 확인
   if (loading) {
@@ -97,9 +115,28 @@ export default function History() {
             <p style={{ 
               margin: 0, 
               fontSize: 16, 
-              color: '#6b7280' 
+              color: '#6b7280',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8
             }}>
-              {user.email}님의 감정 변화를 시각적으로 확인하세요
+              {userTitle && (
+                <span
+                  style={{
+                    display: 'inline-block',
+                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                    color: '#fff',
+                    padding: '4px 12px',
+                    borderRadius: '20px',
+                    fontSize: '14px',
+                    fontWeight: '600',
+                    boxShadow: '0 2px 8px rgba(102, 126, 234, 0.3)',
+                  }}
+                >
+                  🏆 {userTitle}
+                </span>
+              )}
+              <span>{user.email}님의 감정 변화를 시각적으로 확인하세요</span>
             </p>
           </div>
           
@@ -128,6 +165,12 @@ export default function History() {
             ← 다이어리로 돌아가기
           </button>
         </div>
+
+        {/* 감정 칭호 카드 */}
+        <EmotionTitle />
+
+        {/* 감정 TOP 5 */}
+        <EmotionTopFive />
 
         {/* 기간 선택 카드 */}
         <div style={{

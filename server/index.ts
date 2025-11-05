@@ -2005,6 +2005,152 @@ function getPreviousDate(dateStr: string): string {
   return date.toISOString().split('T')[0];
 }
 
+// GET /api/user/emotion-stats - 감정 통계 조회
+app.get('/api/user/emotion-stats', authMiddleware, async (req: any, res) => {
+  try {
+    const userId = req.user.sub;
+    const client = await getClient();
+    const db = client.db(DB_NAME);
+    
+    // mood가 있는 모든 세션 조회
+    const sessions = await db
+      .collection('diary_sessions')
+      .find({ 
+        userId,
+        mood: { $exists: true, $ne: null }
+      })
+      .toArray();
+    
+    if (sessions.length === 0) {
+      return res.json({ 
+        ok: true, 
+        totalSessions: 0,
+        topEmotions: [],
+        emotionDistribution: {}
+      });
+    }
+    
+    // 감정별 카운트
+    const emotionCount: Record<string, { emotion: string; color: string; count: number }> = {};
+    
+    sessions.forEach(session => {
+      const emotion = session.mood?.emotion;
+      const color = session.mood?.color || '#9ca3af';
+      
+      if (emotion) {
+        if (!emotionCount[emotion]) {
+          emotionCount[emotion] = { emotion, color, count: 0 };
+        }
+        emotionCount[emotion].count++;
+      }
+    });
+    
+    // TOP 5 추출
+    const topEmotions = Object.values(emotionCount)
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 5)
+      .map((item, index) => ({
+        rank: index + 1,
+        emotion: item.emotion,
+        color: item.color,
+        count: item.count,
+        percentage: Math.round((item.count / sessions.length) * 100)
+      }));
+    
+    res.json({ 
+      ok: true, 
+      totalSessions: sessions.length,
+      topEmotions,
+      emotionDistribution: emotionCount
+    });
+  } catch (e) {
+    console.error('감정 통계 조회 오류:', e);
+    res.status(500).json({ message: '감정 통계 조회 오류' });
+  }
+});
+
+// GET /api/user/emotion-title - 감정 칭호 생성
+app.get('/api/user/emotion-title', authMiddleware, async (req: any, res) => {
+  try {
+    const userId = req.user.sub;
+    const client = await getClient();
+    const db = client.db(DB_NAME);
+    const openai = new OpenAI({ apiKey: OPENAI_API_KEY });
+    
+    // 최근 30일 또는 최대 50개 세션 조회
+    const sessions = await db
+      .collection('diary_sessions')
+      .find({ 
+        userId,
+        mood: { $exists: true, $ne: null }
+      })
+      .sort({ date: -1 })
+      .limit(50)
+      .toArray();
+    
+    if (sessions.length === 0) {
+      return res.json({ 
+        ok: true, 
+        title: '감정 탐험가',
+        description: '아직 충분한 대화 기록이 없습니다. 더 많은 대화를 나눠보세요!'
+      });
+    }
+    
+    // 감정 분포 분석
+    const emotionCount: Record<string, number> = {};
+    sessions.forEach(session => {
+      const emotion = session.mood?.emotion;
+      if (emotion) {
+        emotionCount[emotion] = (emotionCount[emotion] || 0) + 1;
+      }
+    });
+    
+    const totalCount = sessions.length;
+    const topEmotion = Object.entries(emotionCount)
+      .sort((a, b) => b[1] - a[1])[0];
+    
+    // OpenAI로 칭호 생성
+    const emotionSummary = Object.entries(emotionCount)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([emotion, count]) => `${emotion} ${Math.round((count / totalCount) * 100)}%`)
+      .join(', ');
+    
+    const prompt = `사용자의 최근 ${totalCount}개 대화 감정 분석 결과입니다:
+${emotionSummary}
+
+가장 많이 느낀 감정: ${topEmotion[0]} (${Math.round((topEmotion[1] / totalCount) * 100)}%)
+
+위 데이터를 바탕으로 사용자의 감정 특성을 한 문구로 표현해주세요.
+형식: "[형용사] [형용사] [명사]" (예: "화가 많지만 잘 절제하는 감정 조율사", "긍정적이고 밝은 에너지의 소유자")
+
+조건:
+- 10자 이내로 짧게
+- 긍정적이고 공감적인 톤
+- 사용자를 존중하는 표현
+- 칭호만 답변 (설명 제외)`;
+
+    const completion = await openai.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages: [{ role: 'user', content: prompt }],
+      temperature: 0.8,
+      max_tokens: 50
+    });
+    
+    const title = completion.choices[0]?.message?.content?.trim() || '감정 탐험가';
+    
+    res.json({ 
+      ok: true, 
+      title,
+      emotionSummary,
+      totalSessions: totalCount
+    });
+  } catch (e) {
+    console.error('감정 칭호 생성 오류:', e);
+    res.status(500).json({ message: '감정 칭호 생성 오류' });
+  }
+});
+
 // POST /api/diary/session/:id/chat { text }
 app.post('/api/diary/session/:id/chat', authMiddleware, async (req: any, res) => {
   try {
