@@ -1,0 +1,135 @@
+.streak-widget {
+  background: linear-gradient(135deg, #ff6b6b 0%, #ff8e53 100%);
+  border-radius: 16px;
+  padding: 16px;
+  color: white;
+  box-shadow: 0 4px 12px rgba(255, 107, 107, 0.3);
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.streak-widget:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(255, 107, 107, 0.4);
+}
+
+.streak-widget.skeleton {
+  background: linear-gradient(135deg, #ddd 0%, #ccc 100%);
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+.streak-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.streak-icon {
+  font-size: 2.5rem;
+  animation: flicker 2s ease-in-out infinite;
+}
+
+@keyframes flicker {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.1); opacity: 0.9; }
+}
+
+.streak-info {
+  flex: 1;
+}
+
+.streak-current {
+  font-size: 1.1rem;
+  font-weight: 700;
+  margin-bottom: 4px;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.streak-status {
+  font-size: 0.85rem;
+  opacity: 0.95;
+}
+
+.status-done {
+  color: #fff;
+  font-weight: 600;
+}
+
+.status-pending {
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.streak-longest {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 8px;
+  margin-bottom: 12px;
+  font-size: 0.9rem;
+}
+
+.streak-longest .label {
+  opacity: 0.9;
+}
+
+.streak-longest .value {
+  font-weight: 700;
+  font-size: 1rem;
+}
+
+.streak-milestones {
+  display: flex;
+  gap: 8px;
+  padding: 8px 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.2);
+  margin-top: 8px;
+}
+
+.milestone-badge {
+  font-size: 1.5rem;
+  padding: 4px;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+  cursor: help;
+  transition: transform 0.2s;
+}
+
+.milestone-badge:hover {
+  transform: scale(1.15);
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.streak-reminder {
+  margin-top: 12px;
+  font-size: 0.85rem;
+  text-align: center;
+  padding: 8px;
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 8px;
+  font-weight: 500;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+@media (max-width: 768px) {
+  .streak-widget {
+    padding: 12px;
+  }
+
+  .streak-icon {
+    font-size: 2rem;
+  }
+
+  .streak-current {
+    font-size: 1rem;
+  }
+
+  .milestone-badge {
+    font-size: 1.2rem;
+  }
+}

@@ -4,9 +4,11 @@ import type { ReactNode } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import EmotionOrbPremium from '../components/EmotionOrbPremium';
+import ColorCircle from '../components/ColorCircle';
 import { useToast } from '../components/Toast';
 import { ChatLoadingSkeleton, DiaryListSkeleton } from '../components/Skeleton';
 import DiaryCalendar from '../components/DiaryCalendar';
+import StreakWidget from '../components/StreakWidget';
 import type { DiarySessionResponse, DiaryMessageResponse, DiarySessionsApiResponse, DiarySessionDetailApiResponse } from '../types/api';
 
 type DiaryListItem = DiarySessionResponse;
@@ -721,6 +723,47 @@ export default function Diary() {
                 }
             }
             
+            // 스트릭 마일스톤 체크
+            try {
+                const streakRes = await fetch('/api/user/streak', {
+                    headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+                });
+                if (streakRes.ok) {
+                    const streakData = await streakRes.json();
+                    if (streakData.ok) {
+                        const streak = streakData.currentStreak;
+                        // 마일스톤 배지: 7일, 30일, 100일, 365일
+                        if (streak === 7) {
+                            showToast({ 
+                                message: '🎯 축하합니다! 7일 연속 기록 달성!', 
+                                type: 'success',
+                                duration: 5000
+                            });
+                        } else if (streak === 30) {
+                            showToast({ 
+                                message: '🏆 대단해요! 30일 연속 기록 달성!', 
+                                type: 'success',
+                                duration: 5000
+                            });
+                        } else if (streak === 100) {
+                            showToast({ 
+                                message: '👑 놀라워요! 100일 연속 기록 달성!', 
+                                type: 'success',
+                                duration: 5000
+                            });
+                        } else if (streak === 365) {
+                            showToast({ 
+                                message: '💎 경이로워요! 365일 연속 기록 달성!', 
+                                type: 'success',
+                                duration: 5000
+                            });
+                        }
+                    }
+                }
+            } catch (e) {
+                console.error('스트릭 체크 오류:', e);
+            }
+            
             // 최소 메시지 도달 시 토스트 알림 + 진단 완료 애니메이션
             const newCanAnalyze = newMessageCount >= MIN_REQUIRED_MESSAGES;
             if (newCanAnalyze && !prevCanAnalyze && newMood) {
@@ -1025,6 +1068,11 @@ export default function Diary() {
                     </button>
                 </div>
 
+                {/* 스트릭 위젯 */}
+                <div style={{ marginBottom: 16 }}>
+                    <StreakWidget />
+                </div>
+
                 {/* 검색 입력창 - 최상단으로 이동 */}
                 <div style={{ marginBottom: 16, padding: '6px', background: '#fff', borderRadius: 12, border: '1px solid #e5e7eb', boxSizing: 'border-box' }}>
                     <input
@@ -1231,7 +1279,7 @@ export default function Diary() {
                                                                             style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'transparent', border: 'none', padding: 0, cursor: 'pointer', flex: 1, textAlign: 'left' }}
                                                                         >
                                                                             <div style={{ width: 12, height: 12, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                                                                <EmotionOrbPremium color={item.mood?.color || '#bdbdbd'} size={12} className="no-anim" />
+                                                                                <ColorCircle color={item.mood?.color || '#bdbdbd'} size={12} />
                                                                             </div>
                                                                             <div style={{ 
                                                                                 fontWeight: 600, 

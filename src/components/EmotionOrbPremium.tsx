@@ -205,7 +205,7 @@ const LiquidCore = memo(function LiquidCore({ color }: { color: string }) {
     };
   }, [color]);
 
-  useFrame(({ clock }) => {
+  useFrame(({ clock, invalidate }) => {
     const t = clock.getElapsedTime();
     
     // Much faster organic rotation for dynamic aurora flow
@@ -249,6 +249,9 @@ const LiquidCore = memo(function LiquidCore({ color }: { color: string }) {
         }
       }
     }
+    
+    // frameloop="demand"일 때 계속 렌더링되도록 invalidate 호출
+    invalidate();
   });
   
   // 색상 변경 시 target 업데이트 (즉시 적용하지 않고 useFrame에서 lerp)
@@ -379,6 +382,7 @@ const EmotionOrbPremium = memo(function EmotionOrbPremium({
   messageCount = 0
 }: EmotionOrbPremiumProps) {
   const [cyclingColorIndex, setCyclingColorIndex] = useState(0);
+  const glRef = useRef<THREE.WebGLRenderer | null>(null);
   
   // 진단 중일 때 색상 순환
   useEffect(() => {
@@ -394,18 +398,20 @@ const EmotionOrbPremium = memo(function EmotionOrbPremium({
   // 진단 중일 때는 순환 색상, 아니면 지정된 색상
   const displayColor = analyzing ? EMOTION_COLORS[cyclingColorIndex] : color;
   
-  // 컴포넌트 마운트 시 한 번만 로그
+  // WebGL 컨텍스트 정리
   useEffect(() => {
-    if (import.meta.env.DEV) {
-      console.log('🌟 EmotionOrbPremium 마운트:', { 
-        color,
-        displayColor,
-        analyzing,
-        size,
-        intensity
-      });
-    }
-  }, []); // 빈 의존성 배열 = 마운트 시 한 번만
+    return () => {
+      if (glRef.current) {
+        try {
+          glRef.current.dispose();
+          glRef.current.forceContextLoss();
+          glRef.current = null;
+        } catch (e) {
+          // 조용히 무시
+        }
+      }
+    };
+  }, []);
   
   return (
     <div
@@ -441,16 +447,16 @@ const EmotionOrbPremium = memo(function EmotionOrbPremium({
       >
         <Canvas
           dpr={[1, 1.5]} // dpr을 낮춰서 리소스 절약
-          frameloop="always" // 항상 렌더링
+          frameloop="demand" // 필요할 때만 렌더링 (always에서 변경)
           camera={{ position: [0, 0, 3.8], fov: 38 }}
           gl={{ 
             antialias: true, 
             alpha: true, 
-            powerPreference: 'default',
+            powerPreference: 'low-power', // high-performance에서 low-power로 변경
             toneMapping: THREE.ACESFilmicToneMapping,
             toneMappingExposure: 1.0,
             failIfMajorPerformanceCaveat: false,
-            preserveDrawingBuffer: true, // WebGL 컨텍스트 유지
+            preserveDrawingBuffer: false, // true에서 false로 변경 (메모리 절약)
             stencil: false,
             depth: true,
           }}
@@ -458,10 +464,14 @@ const EmotionOrbPremium = memo(function EmotionOrbPremium({
             display: 'block',
             touchAction: 'none',
           }}
-          onCreated={({ gl, scene }) => {
+          onCreated={({ gl, scene, invalidate }) => {
             // WebGL 설정 최적화
             gl.setClearColor(0x000000, 0);
             scene.background = null;
+            glRef.current = gl;
+            
+            // 컨텍스트 제한 관리
+            gl.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
             
             // forceContextLoss 메서드를 안전하게 오버라이드
             gl.forceContextLoss = function() {
@@ -469,12 +479,10 @@ const EmotionOrbPremium = memo(function EmotionOrbPremium({
               if (ext) {
                 ext.loseContext();
               }
-              // 확장이 없으면 조용히 무시
             };
             
-            if (import.meta.env.DEV) {
-              console.log('✅ Canvas created successfully');
-            }
+            // 초기 렌더링
+            invalidate();
           }}
         >
           {/* Soft ambient fill light */}

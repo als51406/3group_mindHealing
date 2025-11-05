@@ -4,6 +4,7 @@
 
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import StreakWidget from "../components/StreakWidget";
 
 export default function Home() {
 
@@ -62,6 +63,11 @@ export default function Home() {
             </button>
 
             <div className="mainview" style={{ width: 'min(720px, 92%)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 20 }}>
+                {/* 스트릭 위젯 */}
+                <div style={{ width: '100%', maxWidth: 540 }}>
+                    <StreakWidget />
+                </div>
+
                 <div style={{ textAlign: 'center' }}>
                     <div className="home-title" style={{ fontSize: 22, fontWeight: 800, color: '#111827' }}>오늘 하루는 어땠나요?</div>
                     <div className="home-subtitle" style={{ fontSize: 16, color: '#4b5563', marginTop: 6 }}>당신의 이야기를 들려주세요</div>

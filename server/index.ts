@@ -1897,6 +1897,114 @@ app.get('/api/diary/session/:id', authMiddleware, async (req: any, res) => {
   }
 });
 
+// GET /api/user/streak - 연속 기록 일수 조회
+app.get('/api/user/streak', authMiddleware, async (req: any, res) => {
+  try {
+    const userId = req.user.sub;
+    const client = await getClient();
+    const db = client.db(DB_NAME);
+    
+    // 모든 세션을 날짜별로 조회 (최신순)
+    const sessions = await db
+      .collection('diary_sessions')
+      .find({ userId })
+      .sort({ date: -1 })
+      .toArray();
+    
+    if (sessions.length === 0) {
+      return res.json({ 
+        ok: true, 
+        currentStreak: 0, 
+        longestStreak: 0, 
+        todayCompleted: false,
+        totalDays: 0
+      });
+    }
+    
+    // 날짜별로 그룹화 (YYYY-MM-DD)
+    const uniqueDates = new Set<string>();
+    sessions.forEach(session => {
+      if (session.date) {
+        uniqueDates.add(session.date);
+      }
+    });
+    
+    const sortedDates = Array.from(uniqueDates).sort().reverse(); // 최신순
+    
+    // 오늘 날짜 (한국 시간 기준)
+    const now = new Date();
+    const koreaOffset = 9 * 60 * 60 * 1000;
+    const koreaTime = new Date(now.getTime() + koreaOffset);
+    const todayStr = koreaTime.toISOString().split('T')[0];
+    
+    // 오늘 완료 여부
+    const todayCompleted = sortedDates.includes(todayStr);
+    
+    // 현재 스트릭 계산
+    let currentStreak = 0;
+    let checkDate = todayCompleted ? todayStr : null;
+    
+    if (todayCompleted) {
+      currentStreak = 1;
+      checkDate = getPreviousDate(todayStr);
+      
+      for (let i = 1; i < sortedDates.length; i++) {
+        if (sortedDates[i] === checkDate) {
+          currentStreak++;
+          checkDate = getPreviousDate(checkDate);
+        } else {
+          break;
+        }
+      }
+    } else {
+      // 오늘 안 했으면 어제부터 체크
+      checkDate = getPreviousDate(todayStr);
+      
+      for (let i = 0; i < sortedDates.length; i++) {
+        if (sortedDates[i] === checkDate) {
+          currentStreak++;
+          checkDate = getPreviousDate(checkDate);
+        } else {
+          break;
+        }
+      }
+    }
+    
+    // 최장 스트릭 계산
+    let longestStreak = 0;
+    let tempStreak = 1;
+    
+    for (let i = 0; i < sortedDates.length - 1; i++) {
+      const expectedPrev = getPreviousDate(sortedDates[i]);
+      if (sortedDates[i + 1] === expectedPrev) {
+        tempStreak++;
+      } else {
+        longestStreak = Math.max(longestStreak, tempStreak);
+        tempStreak = 1;
+      }
+    }
+    longestStreak = Math.max(longestStreak, tempStreak);
+    
+    res.json({ 
+      ok: true, 
+      currentStreak, 
+      longestStreak, 
+      todayCompleted,
+      totalDays: uniqueDates.size
+    });
+  } catch (e) {
+    console.error('스트릭 조회 오류:', e);
+    res.status(500).json({ message: '스트릭 조회 오류' });
+  }
+});
+
+// 날짜 -1일 계산 헬퍼 함수
+function getPreviousDate(dateStr: string): string {
+  const date = new Date(dateStr + 'T00:00:00Z');
+  date.setUTCDate(date.getUTCDate() - 1);
+  return date.toISOString().split('T')[0];
+}
+
 // POST /api/diary/session/:id/chat { text }
 app.post('/api/diary/session/:id/chat', authMiddleware, async (req: any, res) => {
   try {
