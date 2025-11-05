@@ -380,7 +380,7 @@ app.post('/api/ai/analyze-emotion', authMiddleware, async (req: any, res) => {
   try {
     if (!OPENAI_API_KEY) return res.status(500).json({ message: 'OPENAI_API_KEY 미설정' });
     
-    const { text } = req.body || {};
+    const { text, enhanced } = req.body || {};
     if (!text || typeof text !== 'string' || !text.trim()) {
       return res.status(400).json({ message: '분석할 텍스트가 필요합니다.' });
     }
@@ -389,19 +389,202 @@ app.post('/api/ai/analyze-emotion', authMiddleware, async (req: any, res) => {
     const db = client.db(DB_NAME);
     const userId = req.user.sub;
     
-    // 감정 분석 실행
-    const mood = await detectEmotionFromText(text);
-    
-    // 개인화된 색상 적용
-    const personalizedColor = await personalizedColorForEmotion(db, userId, mood.color, mood.emotion);
-    const finalMood = { ...mood, color: personalizedColor };
-    
-    res.json({ ok: true, mood: finalMood });
+    // enhanced=true이면 복합 감정 분석 사용
+    if (enhanced) {
+      // 이전 감정 데이터 가져오기 (최근 10개)
+      const previousSessions = await db
+        .collection('diary_sessions')
+        .find({ userId })
+        .sort({ createdAt: -1 })
+        .limit(10)
+        .project({ mood: 1, enhancedMood: 1 })
+        .toArray();
+      
+      const previousMoods = previousSessions
+        .map((s: any) => s.enhancedMood || s.mood)
+        .filter(Boolean);
+      
+      // 복합 감정 분석 실행
+      const enhancedMood = await detectEnhancedEmotion(text, previousMoods);
+      
+      // 기존 mood 형식도 함께 반환 (하위 호환성)
+      const simpleMood = {
+        emotion: enhancedMood.primary.emotion,
+        score: enhancedMood.primary.score / 100, // 0-1 스케일로 변환
+        color: enhancedMood.primary.color
+      };
+      
+      res.json({ ok: true, mood: simpleMood, enhancedMood });
+    } else {
+      // 기존 단일 감정 분석
+      const mood = await detectEmotionFromText(text);
+      
+      // 개인화된 색상 적용
+      const personalizedColor = await personalizedColorForEmotion(db, userId, mood.color, mood.emotion);
+      const finalMood = { ...mood, color: personalizedColor };
+      
+      res.json({ ok: true, mood: finalMood });
+    }
   } catch (e: any) {
     console.error('감정 분석 API 오류:', e?.message || e);
     res.status(500).json({ message: '감정 분석 중 오류가 발생했습니다.' });
   }
 });
+
+// GET /api/emotion/history?days=7 - 감정 히스토리 조회
+app.get('/api/emotion/history', authMiddleware, async (req: any, res) => {
+  try {
+    const client = await getClient();
+    const db = client.db(DB_NAME);
+    const userId = req.user.sub;
+    
+    // 조회할 일수 (기본: 7일, 최대: 30일)
+    const days = Math.min(30, Math.max(1, Number(req.query.days) || 7));
+    
+    // 날짜 범위 계산
+    const endDate = new Date();
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - days);
+    
+    // AI 세션 조회 (날짜 범위 내)
+    const aiSessions = await db
+      .collection('diary_sessions')
+      .find({ 
+        userId,
+        type: 'ai',
+        createdAt: { $gte: startDate, $lte: endDate }
+      })
+      .sort({ createdAt: 1 }) // 시간순 정렬
+      .project({ 
+        date: 1, 
+        mood: 1, 
+        enhancedMood: 1, 
+        createdAt: 1,
+        lastUpdatedAt: 1 
+      })
+      .toArray();
+    
+    // 온라인 채팅 세션 조회
+    const onlineSessions = await db
+      .collection('diary_sessions')
+      .find({ 
+        userId,
+        type: 'online',
+        createdAt: { $gte: startDate, $lte: endDate }
+      })
+      .sort({ createdAt: 1 })
+      .project({ 
+        date: 1, 
+        mood: 1, 
+        enhancedMood: 1, 
+        createdAt: 1,
+        lastUpdatedAt: 1 
+      })
+      .toArray();
+    
+    // 데이터 가공
+    const formatSession = (session: any) => ({
+      date: session.date,
+      timestamp: session.lastUpdatedAt || session.createdAt,
+      mood: session.mood,
+      enhancedMood: session.enhancedMood,
+      type: session.type || 'ai'
+    });
+    
+    const aiHistory = aiSessions.map(formatSession);
+    const onlineHistory = onlineSessions.map(formatSession);
+    
+    // 날짜별 감정 통계 계산
+    const emotionStats = calculateEmotionStats(aiSessions.concat(onlineSessions));
+    
+    res.json({ 
+      ok: true, 
+      days,
+      startDate: startDate.toISOString(),
+      endDate: endDate.toISOString(),
+      aiHistory,
+      onlineHistory,
+      stats: emotionStats
+    });
+  } catch (e: any) {
+    console.error('감정 히스토리 조회 오류:', e?.message || e);
+    res.status(500).json({ message: '감정 히스토리 조회 중 오류가 발생했습니다.' });
+  }
+});
+
+// 감정 통계 계산 함수
+function calculateEmotionStats(sessions: any[]) {
+  if (sessions.length === 0) {
+    return {
+      totalSessions: 0,
+      emotionDistribution: {},
+      averageIntensity: 0,
+      dominantEmotion: null,
+      positiveRate: 0
+    };
+  }
+  
+  const emotionCounts: { [key: string]: number } = {};
+  const emotionIntensities: { [key: string]: number[] } = {};
+  let totalIntensity = 0;
+  let positiveCount = 0;
+  
+  // 긍정적 감정 목록
+  const positiveEmotions = ['기쁨', '행복', '평온/안도', '만족', '감사', '설렘', '희망'];
+  
+  sessions.forEach((session: any) => {
+    const mood = session.enhancedMood?.primary || session.mood;
+    if (!mood) return;
+    
+    const emotion = mood.emotion;
+    const intensity = mood.intensity || mood.score * 100 || 50;
+    
+    // 감정별 카운트
+    emotionCounts[emotion] = (emotionCounts[emotion] || 0) + 1;
+    
+    // 감정별 강도 수집
+    if (!emotionIntensities[emotion]) {
+      emotionIntensities[emotion] = [];
+    }
+    emotionIntensities[emotion].push(intensity);
+    
+    totalIntensity += intensity;
+    
+    // 긍정 감정 카운트
+    if (positiveEmotions.some(e => emotion.includes(e))) {
+      positiveCount++;
+    }
+  });
+  
+  // 가장 빈번한 감정 찾기
+  let dominantEmotion: string | null = null;
+  let maxCount = 0;
+  for (const [emotion, count] of Object.entries(emotionCounts)) {
+    if (count > maxCount) {
+      maxCount = count;
+      dominantEmotion = emotion;
+    }
+  }
+  
+  // 감정별 평균 강도 계산
+  const emotionDistribution: any = {};
+  for (const [emotion, intensities] of Object.entries(emotionIntensities)) {
+    const avgIntensity = intensities.reduce((a, b) => a + b, 0) / intensities.length;
+    emotionDistribution[emotion] = {
+      count: emotionCounts[emotion],
+      percentage: Math.round((emotionCounts[emotion] / sessions.length) * 100),
+      avgIntensity: Math.round(avgIntensity)
+    };
+  }
+  
+  return {
+    totalSessions: sessions.length,
+    emotionDistribution,
+    averageIntensity: Math.round(totalIntensity / sessions.length),
+    dominantEmotion,
+    positiveRate: Math.round((positiveCount / sessions.length) * 100)
+  };
+}
 
 app.get('/api/health', async (_req, res) => {
   try {
@@ -683,6 +866,169 @@ async function detectEmotionFromText(text: string): Promise<{ emotion: string; s
   } catch (e) {
     console.error('❌ 감정 분석 오류:', e);
     return { emotion: defaultEmotion, score: 0, color: EMOTION_COLORS[defaultEmotion] || '#A8E6CF' };
+  }
+}
+
+// ========== 감정 분석 고도화: 복합 감정 분석 ==========
+interface EmotionDetail {
+  emotion: string;
+  score: number;
+  color: string;
+  intensity: number; // 0-100
+}
+
+interface EnhancedMoodResult {
+  primary: EmotionDetail;
+  secondary: EmotionDetail[];
+  trend?: 'improving' | 'stable' | 'declining';
+  triggerWords: string[];
+  timestamp: string;
+}
+
+async function detectEnhancedEmotion(text: string, previousMoods?: any[]): Promise<EnhancedMoodResult> {
+  const emotionKeys = Object.keys(EMOTION_COLORS);
+  const emotionList = emotionKeys.join(', ');
+  const defaultEmotion = emotionKeys[0] || '평온/안도';
+  
+  const openai = new OpenAI({ apiKey: OPENAI_API_KEY });
+  const prompt = `다음 한국어 텍스트에서 사용자의 감정을 **복합적으로** 분석하세요.
+
+감정 목록: ${emotionList}
+
+출력 형식 (반드시 JSON):
+{
+  "primary": {"emotion":"<주 감정>","score":0-100,"intensity":0-100},
+  "secondary": [
+    {"emotion":"<부 감정1>","score":0-100,"intensity":0-100},
+    {"emotion":"<부 감정2>","score":0-100,"intensity":0-100}
+  ],
+  "triggerWords": ["키워드1", "키워드2", "키워드3"]
+}
+
+규칙:
+1. primary: 가장 강한 감정 1개
+2. secondary: 함께 느껴지는 감정 최대 2개 (없으면 빈 배열)
+3. intensity: 감정의 강도 (0=매우 약함, 100=매우 강함)
+4. triggerWords: 감정을 유발한 핵심 단어/구절 (최대 5개)
+
+텍스트: ${text}`;
+
+  try {
+    const resp = await openai.chat.completions.create({
+      model: OPENAI_MODEL,
+      messages: [
+        { 
+          role: 'system', 
+          content: `You are an advanced emotion analyzer that detects multiple emotions simultaneously.
+Return only valid JSON with no additional text.`
+        },
+        { role: 'user', content: prompt },
+      ],
+      temperature: 0.2,
+    });
+    
+    const raw = resp.choices?.[0]?.message?.content || '{}';
+    console.log('🌈 복합 감정 분석 응답:', raw);
+    
+    let parsed: any = {};
+    try { parsed = JSON.parse(raw); } catch { parsed = {}; }
+    
+    // Primary 감정 처리
+    const primaryEmotion = parsed.primary?.emotion || defaultEmotion;
+    const primaryScore = Math.max(0, Math.min(100, Number(parsed.primary?.score) || 50));
+    const primaryIntensity = Math.max(0, Math.min(100, Number(parsed.primary?.intensity) || 50));
+    const primaryColor = EMOTION_COLORS[primaryEmotion] || EMOTION_COLORS[defaultEmotion] || '#A8E6CF';
+    
+    const primary: EmotionDetail = {
+      emotion: primaryEmotion,
+      score: primaryScore,
+      color: primaryColor,
+      intensity: primaryIntensity
+    };
+    
+    // Secondary 감정들 처리
+    const secondary: EmotionDetail[] = (parsed.secondary || [])
+      .slice(0, 2) // 최대 2개
+      .map((s: any) => ({
+        emotion: s.emotion || defaultEmotion,
+        score: Math.max(0, Math.min(100, Number(s.score) || 30)),
+        color: EMOTION_COLORS[s.emotion] || EMOTION_COLORS[defaultEmotion] || '#A8E6CF',
+        intensity: Math.max(0, Math.min(100, Number(s.intensity) || 30))
+      }));
+    
+    // 트리거 단어 추출
+    const triggerWords: string[] = (parsed.triggerWords || [])
+      .slice(0, 5) // 최대 5개
+      .map((w: any) => String(w).trim())
+      .filter((w: string) => w.length > 0);
+    
+    // 추세 계산 (이전 감정 데이터가 있으면)
+    let trend: 'improving' | 'stable' | 'declining' | undefined;
+    if (previousMoods && previousMoods.length > 0) {
+      trend = calculateEmotionTrend(primaryEmotion, primaryIntensity, previousMoods);
+    }
+    
+    const result: EnhancedMoodResult = {
+      primary,
+      secondary,
+      trend,
+      triggerWords,
+      timestamp: new Date().toISOString()
+    };
+    
+    console.log('✅ 복합 감정 분석 완료:', JSON.stringify(result, null, 2));
+    return result;
+    
+  } catch (e) {
+    console.error('❌ 복합 감정 분석 오류:', e);
+    // Fallback
+    return {
+      primary: {
+        emotion: defaultEmotion,
+        score: 50,
+        color: EMOTION_COLORS[defaultEmotion] || '#A8E6CF',
+        intensity: 50
+      },
+      secondary: [],
+      triggerWords: [],
+      timestamp: new Date().toISOString()
+    };
+  }
+}
+
+// 감정 추세 계산 함수
+function calculateEmotionTrend(
+  currentEmotion: string,
+  currentIntensity: number,
+  previousMoods: any[]
+): 'improving' | 'stable' | 'declining' {
+  // 최근 3개 감정 데이터 분석
+  const recent = previousMoods.slice(-3);
+  
+  // 긍정적 감정 목록
+  const positiveEmotions = ['기쁨', '행복', '평온/안도', '만족', '감사', '설렘', '희망'];
+  const negativeEmotions = ['슬픔', '우울', '화남', '짜증', '불안', '스트레스', '외로움', '후회'];
+  
+  // 현재 감정이 긍정적인지 판단
+  const isCurrentPositive = positiveEmotions.some(e => currentEmotion.includes(e));
+  
+  // 이전 감정들의 긍정도 계산
+  let previousPositiveCount = 0;
+  for (const mood of recent) {
+    const emotion = mood.emotion || mood.primary?.emotion || '';
+    if (positiveEmotions.some(e => emotion.includes(e))) {
+      previousPositiveCount++;
+    }
+  }
+  
+  const positiveRatio = previousPositiveCount / recent.length;
+  
+  if (isCurrentPositive && positiveRatio < 0.5) {
+    return 'improving'; // 부정 → 긍정
+  } else if (!isCurrentPositive && positiveRatio > 0.5) {
+    return 'declining'; // 긍정 → 부정
+  } else {
+    return 'stable'; // 유지
   }
 }
 

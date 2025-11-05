@@ -26,6 +26,7 @@ export default function Chat() {
     // 감정 진단 관련 상태
     const [messageCount, setMessageCount] = useState<number>(0); // 사용자 메시지 개수
     const [mood, setMood] = useState<{ emotion: string; score: number; color: string } | null>(null);
+    const [enhancedMood, setEnhancedMood] = useState<any>(null); // 복합 감정 분석 결과
     const [isAnalyzing, setIsAnalyzing] = useState(false); // 감정 분석 중
     const [savingToDiary, setSavingToDiary] = useState(false); // 다이어리 저장 중
     const [emotionColor, setEmotionColor] = useState<string | null>(null); // 감정 색상
@@ -370,12 +371,12 @@ export default function Chat() {
                 textPreview: allText.slice(-100)
             });
             
-            // 감정 분석 API 호출
+            // 복합 감정 분석 API 호출 (enhanced=true)
             const res = await fetch('/api/ai/analyze-emotion', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 credentials: 'include',
-                body: JSON.stringify({ text: allText })
+                body: JSON.stringify({ text: allText, enhanced: true })
             });
             
             if (!res.ok) {
@@ -384,15 +385,40 @@ export default function Chat() {
             
             const data = await res.json();
             const analyzedMood = data?.mood;
+            const analyzedEnhancedMood = data?.enhancedMood;
             
             if (analyzedMood && analyzedMood.emotion && analyzedMood.color) {
                 setMood(analyzedMood);
+                setEnhancedMood(analyzedEnhancedMood); // 복합 감정 데이터 저장
                 setEmotionColor(analyzedMood.color); // 배경 그라데이션 색상 업데이트
+                
                 console.log('✅ Chat.tsx 감정 분석 완료:', analyzedMood);
+                console.log('🌈 Chat.tsx 복합 감정:', analyzedEnhancedMood);
+                
+                // 복합 감정 정보 포함한 Toast 메시지
+                let toastMessage = `✨ 감정 분석 완료! ${analyzedMood.emotion} (${Math.round(analyzedMood.score * 100)}%)`;
+                
+                if (analyzedEnhancedMood) {
+                    const { secondary, trend } = analyzedEnhancedMood;
+                    
+                    // 부 감정이 있으면 표시
+                    if (secondary && secondary.length > 0) {
+                        const secondaryNames = secondary.map((s: any) => s.emotion).join(', ');
+                        toastMessage += `\n+ ${secondaryNames}`;
+                    }
+                    
+                    // 추세 표시
+                    if (trend) {
+                        const trendEmoji = trend === 'improving' ? '📈' : trend === 'declining' ? '📉' : '➡️';
+                        const trendText = trend === 'improving' ? '개선 중' : trend === 'declining' ? '주의 필요' : '안정적';
+                        toastMessage += `\n${trendEmoji} ${trendText}`;
+                    }
+                }
+                
                 showToast({ 
-                    message: `✨ 감정 분석 완료! ${analyzedMood.emotion} (${Math.round(analyzedMood.score * 100)}%)`, 
+                    message: toastMessage, 
                     type: 'success', 
-                    duration: 3500 
+                    duration: 5000 
                 });
             } else {
                 throw new Error('감정 분석 결과가 유효하지 않습니다.');
@@ -660,7 +686,7 @@ export default function Chat() {
                         )}
                     </div>
                     
-                    {/* 진단 완료 시: 컬러 코드 + 다이어리 추가 버튼 */}
+                    {/* 진단 완료 시: 컬러 코드 + 복합 감정 + 다이어리 추가 버튼 */}
                     {mood && (
                         <>
                             <div style={{
@@ -699,6 +725,101 @@ export default function Chat() {
                                     </code>
                                 </div>
                             </div>
+                            
+                            {/* 복합 감정 분석 결과 표시 */}
+                            {enhancedMood && (
+                                <div style={{
+                                    padding: '12px',
+                                    borderRadius: 8,
+                                    background: 'rgba(255, 255, 255, 0.6)',
+                                    marginBottom: 12
+                                }}>
+                                    <div style={{ 
+                                        fontSize: 14, 
+                                        fontWeight: 600, 
+                                        marginBottom: 8,
+                                        color: '#374151'
+                                    }}>
+                                        🌈 감정 분석 상세
+                                    </div>
+                                    
+                                    {/* 부 감정 표시 */}
+                                    {enhancedMood.secondary && enhancedMood.secondary.length > 0 && (
+                                        <div style={{ 
+                                            fontSize: 13, 
+                                            marginBottom: 6,
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: 6,
+                                            flexWrap: 'wrap'
+                                        }}>
+                                            <span style={{ color: '#6b7280' }}>함께 느껴지는 감정:</span>
+                                            {enhancedMood.secondary.map((s: any, idx: number) => (
+                                                <span 
+                                                    key={idx}
+                                                    style={{
+                                                        padding: '2px 8px',
+                                                        borderRadius: 12,
+                                                        background: s.color + '30',
+                                                        color: '#374151',
+                                                        fontSize: 12,
+                                                        fontWeight: 600
+                                                    }}
+                                                >
+                                                    {s.emotion}
+                                                </span>
+                                            ))}
+                                        </div>
+                                    )}
+                                    
+                                    {/* 추세 표시 */}
+                                    {enhancedMood.trend && (
+                                        <div style={{ 
+                                            fontSize: 13, 
+                                            marginBottom: 6,
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: 6
+                                        }}>
+                                            <span style={{ color: '#6b7280' }}>감정 추세:</span>
+                                            <span style={{ fontWeight: 600 }}>
+                                                {enhancedMood.trend === 'improving' && '📈 개선 중'}
+                                                {enhancedMood.trend === 'declining' && '📉 주의 필요'}
+                                                {enhancedMood.trend === 'stable' && '➡️ 안정적'}
+                                            </span>
+                                        </div>
+                                    )}
+                                    
+                                    {/* 트리거 단어 표시 */}
+                                    {enhancedMood.triggerWords && enhancedMood.triggerWords.length > 0 && (
+                                        <div style={{ 
+                                            fontSize: 13,
+                                            display: 'flex',
+                                            alignItems: 'flex-start',
+                                            gap: 6
+                                        }}>
+                                            <span style={{ color: '#6b7280', flexShrink: 0 }}>주요 키워드:</span>
+                                            <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                                                {enhancedMood.triggerWords.map((word: string, idx: number) => (
+                                                    <span 
+                                                        key={idx}
+                                                        style={{
+                                                            padding: '2px 6px',
+                                                            borderRadius: 4,
+                                                            background: 'rgba(99, 102, 241, 0.1)',
+                                                            color: '#4f46e5',
+                                                            fontSize: 11,
+                                                            fontWeight: 500
+                                                        }}
+                                                    >
+                                                        #{word}
+                                                    </span>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
                             
                             <button
                                 onClick={() => void saveToDiary()}

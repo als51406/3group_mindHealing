@@ -9,6 +9,7 @@ import Online from './pages/Online';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import OrbShowcase from './pages/OrbShowcase';
+import History from './pages/History';
 
 
 export default function App() {
@@ -24,6 +25,7 @@ export default function App() {
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
           <Route path="/orb-showcase" element={<OrbShowcase />} />
+          <Route path="/history" element={<History />} />
         </Routes>
       </div>
     </Router>
