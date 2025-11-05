@@ -131,14 +131,14 @@ const LiquidCore = memo(function LiquidCore({ color, intensity }: { color: strin
 	useEffect(() => {
 		// GSAP: 파동 강도(uPulse)와 그룹 모션을 부드럽게 루프
 		const tl = gsap.timeline({ repeat: -1, yoyo: true, defaults: { ease: 'sine.inOut' } });
-		tl.to(pulseRef.current, { value: 1.6, duration: 4.2 })
-			.to(pulseRef.current, { value: 0.8, duration: 3.8 });
+		tl.to(pulseRef.current, { value: 1.6 * intensity, duration: 4.2 })
+			.to(pulseRef.current, { value: 0.8 * intensity, duration: 3.8 });
 		if (groupRef.current) {
 			gsap.to(groupRef.current.rotation, { y: '+=6.283', duration: 80, ease: 'none', repeat: -1 }); // 360° 천천히
-			gsap.to(groupRef.current.position, { y: 0.06, duration: 3.5, yoyo: true, repeat: -1 });
+			gsap.to(groupRef.current.position, { y: 0.06 * intensity, duration: 3.5, yoyo: true, repeat: -1 });
 		}
 		return () => { tl.kill(); };
-	}, []);
+	}, [intensity]);
 
 	useFrame(({ clock }) => {
 		const t = clock.getElapsedTime();
@@ -236,6 +236,20 @@ const EmotionOrbv5 = memo(function EmotionOrbv5({ color, size = 280, className =
 						// @ts-ignore
 						toneMapping: THREE.ACESFilmicToneMapping,
 						toneMappingExposure: 0.95,
+					}}
+					onCreated={({ gl, scene }) => {
+						// WebGL 설정 최적화
+						gl.setClearColor(0x000000, 0);
+						scene.background = null;
+						
+						// forceContextLoss 메서드를 안전하게 오버라이드
+						gl.forceContextLoss = function() {
+							const ext = gl.getContext().getExtension('WEBGL_lose_context');
+							if (ext) {
+								ext.loseContext();
+							}
+							// 확장이 없으면 조용히 무시
+						};
 					}}
 				>
 					{/* Lighting */}

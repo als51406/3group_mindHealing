@@ -463,6 +463,15 @@ const EmotionOrbPremium = memo(function EmotionOrbPremium({
             gl.setClearColor(0x000000, 0);
             scene.background = null;
             
+            // forceContextLoss 메서드를 안전하게 오버라이드
+            gl.forceContextLoss = function() {
+              const ext = gl.getContext().getExtension('WEBGL_lose_context');
+              if (ext) {
+                ext.loseContext();
+              }
+              // 확장이 없으면 조용히 무시
+            };
+            
             if (import.meta.env.DEV) {
               console.log('✅ Canvas created successfully');
             }

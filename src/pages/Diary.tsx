@@ -710,6 +710,17 @@ export default function Diary() {
             setMood(newMood);
             setMessageCount(newMessageCount);
             
+            // 목표 달성 알림
+            if (data?.goalsCompleted && data.goalsCompleted.length > 0) {
+                for (const goal of data.goalsCompleted) {
+                    showToast({ 
+                        message: `🎉 목표 달성! ${goal.description}`, 
+                        type: 'success',
+                        duration: 5000
+                    });
+                }
+            }
+            
             // 최소 메시지 도달 시 토스트 알림 + 진단 완료 애니메이션
             const newCanAnalyze = newMessageCount >= MIN_REQUIRED_MESSAGES;
             if (newCanAnalyze && !prevCanAnalyze && newMood) {
@@ -767,6 +778,17 @@ export default function Diary() {
                 console.log('🎨 Analyze:', data?.mood);
             }
             setMood(data?.mood ?? null);
+            
+            // 목표 달성 알림
+            if (data?.goalsCompleted && data.goalsCompleted.length > 0) {
+                for (const goal of data.goalsCompleted) {
+                    showToast({ 
+                        message: `🎉 목표 달성! ${goal.description}`, 
+                        type: 'success',
+                        duration: 5000
+                    });
+                }
+            }
             
             showToast({ 
                 message: '🎨 감정 분석이 완료되었습니다!', 

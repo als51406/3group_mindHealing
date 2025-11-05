@@ -90,7 +90,7 @@ export default function Goals() {
 
   const fetchGoals = async () => {
     try {
-      const response = await fetch(`http://localhost:7780/api/goals?status=${activeTab}`, {
+      const response = await fetch(`/api/goals?status=${activeTab}`, {
         credentials: 'include'
       });
       const data = await response.json();
@@ -110,7 +110,7 @@ export default function Goals() {
         ? { category: 'emotion', ...newEmotionGoal }
         : { category: 'schedule', ...newScheduleGoal };
 
-      const response = await fetch('http://localhost:7780/api/goals', {
+      const response = await fetch('/api/goals', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -143,7 +143,7 @@ export default function Goals() {
     if (!confirm('이 목표를 삭제하시겠습니까?')) return;
     
     try {
-      const response = await fetch(`http://localhost:7780/api/goals/${goalId}`, {
+      const response = await fetch(`/api/goals/${goalId}`, {
         method: 'DELETE',
         credentials: 'include'
       });
@@ -160,7 +160,7 @@ export default function Goals() {
     if (!confirm('이 목표를 취소하시겠습니까?')) return;
     
     try {
-      const response = await fetch(`http://localhost:7780/api/goals/${goalId}`, {
+      const response = await fetch(`/api/goals/${goalId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -177,7 +177,7 @@ export default function Goals() {
 
   const toggleScheduleComplete = async (goal: ScheduleGoal) => {
     try {
-      const response = await fetch(`http://localhost:7780/api/goals/${goal._id}`, {
+      const response = await fetch(`/api/goals/${goal._id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',

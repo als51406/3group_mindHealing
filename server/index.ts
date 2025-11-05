@@ -631,13 +631,18 @@ app.get('/api/emotion/insights', authMiddleware, async (req: any, res) => {
     }
     
     // 감정 데이터 준비
-    const emotionData = sessions.map(s => ({
-      date: new Date(s.createdAt),
-      emotion: s.mood.emotion,
-      score: s.mood.score,
-      intensity: s.enhancedMood?.primary?.intensity || s.mood.score * 100,
-      dayOfWeek: new Date(s.createdAt).getDay()
-    }));
+    const emotionData = sessions.map(s => {
+      const intensity = s.enhancedMood?.primary?.intensity 
+        || (s.mood?.score ? s.mood.score * 100 : 50);
+      
+      return {
+        date: new Date(s.createdAt),
+        emotion: s.mood?.emotion || '알 수 없음',
+        score: s.mood?.score || 0.5,
+        intensity: intensity,
+        dayOfWeek: new Date(s.createdAt).getDay()
+      };
+    });
     
     // 요일별 감정 집계
     const dayStats: { [key: number]: { count: number; totalIntensity: number; emotions: string[] } } = {};
@@ -698,12 +703,19 @@ app.get('/api/emotion/insights', authMiddleware, async (req: any, res) => {
     }
     
     // OpenAI로 인사이트 생성
-    const openai = new OpenAI({ apiKey: OPENAI_API_KEY });
+    let aiInsights = {
+      summary: '데이터를 분석 중입니다.',
+      patterns: [] as string[],
+      recommendations: [] as string[]
+    };
     
-    const bestDayText = bestDay ? `${(bestDay as any).day} (평균 강도 ${(bestDay as any).average})` : '없음';
-    const worstDayText = worstDay ? `${(worstDay as any).day} (평균 강도 ${(worstDay as any).average})` : '없음';
-    
-    const prompt = `당신은 감정 분석 전문가입니다. 다음 사용자의 ${days}일간 감정 데이터를 분석하여 인사이트를 제공하세요.
+    try {
+      const openai = new OpenAI({ apiKey: OPENAI_API_KEY });
+      
+      const bestDayText = bestDay ? `${(bestDay as any).day} (평균 강도 ${(bestDay as any).average})` : '없음';
+      const worstDayText = worstDay ? `${(worstDay as any).day} (평균 강도 ${(worstDay as any).average})` : '없음';
+      
+      const prompt = `당신은 감정 분석 전문가입니다. 다음 사용자의 ${days}일간 감정 데이터를 분석하여 인사이트를 제공하세요.
 
 데이터:
 - 총 대화 수: ${sessions.length}
@@ -721,15 +733,35 @@ app.get('/api/emotion/insights', authMiddleware, async (req: any, res) => {
 
 친근하고 따뜻한 톤으로 작성하세요.`;
 
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
-      messages: [{ role: 'user', content: prompt }],
-      temperature: 0.7,
-      max_tokens: 500
-    });
-    
-    const content = completion.choices[0]?.message?.content || '{}';
-    const aiInsights = JSON.parse(content);
+      const completion = await openai.chat.completions.create({
+        model: 'gpt-4o-mini',
+        messages: [{ role: 'user', content: prompt }],
+        temperature: 0.7,
+        max_tokens: 500
+      });
+      
+      const content = completion.choices[0]?.message?.content || '{}';
+      
+      try {
+        const parsed = JSON.parse(content);
+        aiInsights = {
+          summary: parsed.summary || aiInsights.summary,
+          patterns: Array.isArray(parsed.patterns) ? parsed.patterns : [],
+          recommendations: Array.isArray(parsed.recommendations) ? parsed.recommendations : []
+        };
+      } catch (parseError) {
+        console.error('AI 응답 파싱 오류:', parseError);
+        console.log('원본 응답:', content);
+      }
+    } catch (aiError: any) {
+      console.error('OpenAI API 오류:', aiError.message);
+      // AI 오류가 발생해도 기본 인사이트는 반환
+      aiInsights = {
+        summary: `${days}일간 총 ${sessions.length}개의 대화를 나누셨네요. 계속해서 감정을 기록하면 더 자세한 인사이트를 받을 수 있어요!`,
+        patterns: ['정기적으로 대화를 나누고 계시네요'],
+        recommendations: ['꾸준한 감정 기록을 통해 자신을 더 잘 이해할 수 있어요']
+      };
+    }
     
     res.json({
       ok: true,
@@ -887,7 +919,7 @@ async function updateGoalProgress(db: any, goal: any) {
     // 목표 기간이 지났는지 확인
     if (now > endDate && goal.status === 'active') {
       const achieved = goal.currentValue >= goal.targetValue;
-      await db.collection('emotion_goals').updateOne(
+      await db.collection('goals').updateOne(
         { _id: goal._id },
         { 
           $set: { 
@@ -971,23 +1003,80 @@ async function updateGoalProgress(db: any, goal: any) {
     // 진행률 계산
     const progress = Math.min(100, Math.round((currentValue / goal.targetValue) * 100));
 
+    // 이전 값과 비교하여 변경사항 체크
+    const oldCurrentValue = goal.currentValue || 0;
+    const oldProgress = goal.progress || 0;
+    const justCompleted = progress >= 100 && oldProgress < 100;
+
     // DB 업데이트
-    await db.collection('emotion_goals').updateOne(
+    await db.collection('goals').updateOne(
       { _id: goal._id },
       { 
         $set: { 
           currentValue,
           progress,
-          lastUpdated: now
+          lastUpdated: now,
+          ...(justCompleted ? { status: 'completed', completedAt: now } : {})
         } 
       }
     );
 
     goal.currentValue = currentValue;
     goal.progress = progress;
+    
+    return {
+      goalId: goal._id,
+      changed: currentValue !== oldCurrentValue,
+      justCompleted,
+      progress,
+      currentValue,
+      targetValue: goal.targetValue
+    };
 
   } catch (e) {
     console.error('목표 진행률 업데이트 오류:', e);
+    return null;
+  }
+}
+
+// 사용자의 모든 활성 감정 목표 자동 업데이트
+async function autoUpdateUserGoals(db: any, userId: string) {
+  try {
+    const goals = await db.collection('goals')
+      .find({ 
+        userId, 
+        category: 'emotion',
+        status: 'active'
+      })
+      .toArray();
+    
+    if (goals.length === 0) {
+      return { updated: 0, completed: [] };
+    }
+    
+    const completedGoals: Array<{id: any, type: string, description: string}> = [];
+    let updatedCount = 0;
+    
+    for (const goal of goals) {
+      const result = await updateGoalProgress(db, goal);
+      if (result?.changed) {
+        updatedCount++;
+      }
+      if (result?.justCompleted) {
+        completedGoals.push({
+          id: goal._id,
+          type: goal.type,
+          description: goal.description || `${goal.targetValue}${goal.type === 'positiveRate' ? '%' : '회'} 달성`
+        });
+      }
+    }
+    
+    console.log(`🎯 목표 자동 업데이트: userId=${userId}, 업데이트=${updatedCount}, 달성=${completedGoals.length}`);
+    
+    return { updated: updatedCount, completed: completedGoals };
+  } catch (e) {
+    console.error('사용자 목표 자동 업데이트 오류:', e);
+    return { updated: 0, completed: [] };
   }
 }
 
@@ -1883,23 +1972,38 @@ app.post('/api/diary/session/:id/chat', authMiddleware, async (req: any, res) =>
         { _id: session._id }, 
         { $set: { mood: finalMood, lastUpdatedAt: new Date() } }
       );
+      
+      // 🎯 목표 자동 업데이트
+      const goalUpdateResult = await autoUpdateUserGoals(db, userId);
+      
+      res.status(201).json({ 
+        ok: true, 
+        assistant: { content: cleanReply }, 
+        mood: finalMood,
+        messageCount: userMessageCount,
+        minRequired: minMessages,
+        canAnalyze: userMessageCount >= minMessages,
+        extractedColor: extractedColor, // 디버깅용
+        goalsUpdated: goalUpdateResult.updated,
+        goalsCompleted: goalUpdateResult.completed
+      });
     } else {
       // 최소 사용자 메시지 미만인 경우 타임스탬프만 업데이트
       await db.collection('diary_sessions').updateOne(
         { _id: session._id }, 
         { $set: { lastUpdatedAt: new Date() } }
       );
+      
+      res.status(201).json({ 
+        ok: true, 
+        assistant: { content: cleanReply }, 
+        mood: finalMood,
+        messageCount: userMessageCount,
+        minRequired: minMessages,
+        canAnalyze: userMessageCount >= minMessages,
+        extractedColor: extractedColor // 디버깅용
+      });
     }
-    
-    res.status(201).json({ 
-      ok: true, 
-      assistant: { content: cleanReply }, 
-      mood: finalMood,
-      messageCount: userMessageCount,
-      minRequired: minMessages,
-      canAnalyze: userMessageCount >= minMessages,
-      extractedColor: extractedColor // 디버깅용
-    });
   } catch (e: any) {
     console.error('session chat error:', e?.message || e);
     res.status(500).json({ message: '세션 채팅 처리 오류' });
@@ -1954,10 +2058,15 @@ app.post('/api/diary/session/:id/analyze', authMiddleware, async (req: any, res)
     
     console.log('✅ 수동 분석 완료:', finalMood);
     
+    // 🎯 목표 자동 업데이트
+    const goalUpdateResult = await autoUpdateUserGoals(db, userId);
+    
     res.status(200).json({ 
       ok: true, 
       mood: finalMood,
-      messageCount: userMessages.length
+      messageCount: userMessages.length,
+      goalsUpdated: goalUpdateResult.updated,
+      goalsCompleted: goalUpdateResult.completed
     });
   } catch (e: any) {
     console.error('manual analyze error:', e?.message || e);

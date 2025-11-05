@@ -1,11 +1,8 @@
 import { memo, useEffect, useMemo, useRef } from 'react';
-import { Canvas, useFrame, useThree } from '@react-three/fiber';
+import { Canvas, useFrame } from '@react-three/fiber';
 import { 
   Environment, 
-  MeshTransmissionMaterial, 
-  MeshDistortMaterial,
-  Sphere,
-  useTexture
+  MeshTransmissionMaterial
 } from '@react-three/drei';
 import { EffectComposer, Bloom, ChromaticAberration } from '@react-three/postprocessing';
 import * as THREE from 'three';
@@ -347,6 +344,20 @@ const EmotionOrbv4 = memo(function EmotionOrbv4({
             powerPreference: 'high-performance',
             toneMapping: THREE.ACESFilmicToneMapping,
             toneMappingExposure: 0.95,
+          }}
+          onCreated={({ gl, scene }) => {
+            // WebGL 설정 최적화
+            gl.setClearColor(0x000000, 0);
+            scene.background = null;
+            
+            // forceContextLoss 메서드를 안전하게 오버라이드
+            gl.forceContextLoss = function() {
+              const ext = gl.getContext().getExtension('WEBGL_lose_context');
+              if (ext) {
+                ext.loseContext();
+              }
+              // 확장이 없으면 조용히 무시
+            };
           }}
         >
           {/* Soft ambient lighting */}
