@@ -1,6 +1,12 @@
 import { useCallback, useEffect, useState } from 'react';
 
-export type AuthUser = { id: string; email: string };
+export type AuthUser = { 
+  id: string; 
+  email: string;
+  nickname?: string;
+  title?: string;
+  profileImage?: string;
+};
 
 const MAX_RETRIES = 3;
 const RETRY_DELAY = 1000; // 1초

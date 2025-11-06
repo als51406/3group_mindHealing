@@ -15,7 +15,7 @@ import type { EnhancedMood, EmotionDetail } from '../types/api';
 const Chat: React.FC = () => {
     const navigate = useNavigate(); // 로그인 안 된 사용자를 리다이렉트하기 위해 사용
     const location = useLocation(); // Home에서 전달된 state를 받기 위해 사용
-    const { user, loading } = useAuth(); // 로그인 상태 확인
+    const { user } = useAuth(); // 로그인 상태 확인
     const { showToast, ToastContainer } = useToast(); // Toast 알림
     const [msgs, setMsgs] = useState<AiMsg[]>([
         // 초기 메시지(첫 인사)

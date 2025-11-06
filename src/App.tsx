@@ -11,6 +11,7 @@ import Register from './pages/Register';
 import OrbShowcase from './pages/OrbShowcase';
 import History from './pages/History';
 import Goals from './components/Goals';
+import Profile from './pages/Profile';
 
 
 export default function App() {
@@ -25,6 +26,7 @@ export default function App() {
           <Route path="/online" element={<Online />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
+          <Route path="/profile" element={<Profile />} />
           <Route path="/orb-showcase" element={<OrbShowcase />} />
           <Route path="/history" element={<History />} />
           <Route path="/goals" element={<Goals />} />

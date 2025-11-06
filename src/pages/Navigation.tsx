@@ -97,6 +97,22 @@ export default function Navigation() {
                 >
                     챗온
                 </NavLink>
+                {user && (
+                    <NavLink
+                        to="/profile"
+                        style={({ isActive }) => ({
+                            padding: "6px 10px",
+                            borderRadius: 8,
+                            textDecoration: "none",
+                            border: isActive ? "1px solid #2563eb" : "1px solid transparent",
+                            background: isActive ? "#eef2ff" : "transparent",
+                            color: isActive ? "#1e3a8a" : "#111",
+                            fontWeight: 600,
+                        })}
+                    >
+                        프로필
+                    </NavLink>
+                )}
             </div>
 
             {loading ? (
