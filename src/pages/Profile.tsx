@@ -39,16 +39,20 @@ const Profile: React.FC = () => {
           }
         }
 
-        // 오늘의 감정 로드 (프로필 카드 배경색)
-        const emotionRes = await fetch('/api/diary/today-emotion', {
+        // 전체 감정 분석의 주 감정 색상 로드 (칭호 API에서)
+        const titleRes = await fetch('/api/user/emotion-title', {
           credentials: 'include'
         });
-        if (emotionRes.ok) {
-          const emotionData = await emotionRes.json();
-          if (emotionData.emotion) {
+        if (titleRes.ok) {
+          const titleData = await titleRes.json();
+          if (titleData.emotion && titleData.color) {
             setProfile(prev => ({
               ...prev,
-              todayEmotion: emotionData.emotion,
+              todayEmotion: {
+                emotion: titleData.emotion,
+                color: titleData.color,
+                score: 0
+              },
             }));
           }
         }
@@ -147,16 +151,20 @@ const Profile: React.FC = () => {
         }
       }
 
-      // 오늘의 감정 다시 로드
-      const emotionRes = await fetch('/api/diary/today-emotion', {
+      // 전체 감정 분석의 주 감정 색상 다시 로드
+      const titleRes = await fetch('/api/user/emotion-title', {
         credentials: 'include'
       });
-      if (emotionRes.ok) {
-        const emotionData = await emotionRes.json();
-        if (emotionData.emotion) {
+      if (titleRes.ok) {
+        const titleData = await titleRes.json();
+        if (titleData.emotion && titleData.color) {
           setProfile(prev => ({
             ...prev,
-            todayEmotion: emotionData.emotion,
+            todayEmotion: {
+              emotion: titleData.emotion,
+              color: titleData.color,
+              score: 0
+            },
           }));
         }
       }

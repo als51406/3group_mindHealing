@@ -16,6 +16,7 @@ export default function History() {
   const { user, loading } = useAuth();
   const [chartDays, setChartDays] = useState(7);
   const [userTitle, setUserTitle] = useState('');
+  const [nickname, setNickname] = useState('');
 
   // 캐시된 칭호 로드 및 실시간 업데이트
   useEffect(() => {
@@ -58,6 +59,39 @@ export default function History() {
       clearInterval(interval);
     };
   }, []);
+
+  // 유저 닉네임 로드 및 실시간 업데이트
+  useEffect(() => {
+    const loadNickname = async () => {
+      try {
+        const res = await fetch('/api/me', { credentials: 'include' });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.user?.nickname) {
+            setNickname(data.user.nickname);
+          }
+        }
+      } catch (e) {
+        console.error('Failed to load nickname:', e);
+      }
+    };
+
+    // 초기 로드
+    if (user) {
+      loadNickname();
+    }
+
+    // 프로필 업데이트 이벤트 리스너
+    const handleProfileUpdate = () => {
+      loadNickname();
+    };
+
+    window.addEventListener('profileUpdated', handleProfileUpdate);
+
+    return () => {
+      window.removeEventListener('profileUpdated', handleProfileUpdate);
+    };
+  }, [user]);
 
   // 인증 확인
   if (loading) {
@@ -167,7 +201,7 @@ export default function History() {
                   🏆 {userTitle}
                 </span>
               )}
-              <span>{user.email}님의 감정 변화를 시각적으로 확인하세요</span>
+              <span>{nickname || user.email}님의 감정 변화를 시각적으로 확인하세요</span>
             </p>
           </div>
           

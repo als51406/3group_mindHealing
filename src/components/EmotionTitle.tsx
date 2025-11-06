@@ -5,12 +5,31 @@ import Toast from './Toast';
 const CACHE_KEY = 'emotion_title_cache';
 const CACHE_DURATION = 1000 * 60 * 60; // 1시간
 
+// 색상 밝기 조절 함수
+function adjustColorBrightness(hex: string, percent: number): string {
+  const num = parseInt(hex.replace('#', ''), 16);
+  const r = Math.min(255, Math.max(0, (num >> 16) + percent));
+  const g = Math.min(255, Math.max(0, ((num >> 8) & 0x00FF) + percent));
+  const b = Math.min(255, Math.max(0, (num & 0x0000FF) + percent));
+  return `#${((r << 16) | (g << 8) | b).toString(16).padStart(6, '0')}`;
+}
+
+// hex 색상을 rgba로 변환하는 함수
+function hexToRgba(hex: string, alpha: number): string {
+  const num = parseInt(hex.replace('#', ''), 16);
+  const r = (num >> 16) & 0xFF;
+  const g = (num >> 8) & 0xFF;
+  const b = num & 0xFF;
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
 export default function EmotionTitle() {
   const [title, setTitle] = useState('');
   const [loading, setLoading] = useState(true);
   const [regenerating, setRegenerating] = useState(false);
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
+  const [emotionColor, setEmotionColor] = useState('#a78bfa');
   const isFetchingRef = useRef(false);
   const previousTitleRef = useRef<string>('');
 
@@ -26,6 +45,9 @@ export default function EmotionTitle() {
           setTitle(cachedTitle);
           previousTitleRef.current = cachedTitle; // 초기 칭호 저장
           setLoading(false);
+          
+          // 칭호가 있을 때도 색상을 로드해야 함 (캐시에 색상 정보 없음)
+          fetchEmotionTitle();
           return;
         }
       } catch (e) {
@@ -54,6 +76,12 @@ export default function EmotionTitle() {
         const data = await res.json();
         if (data.ok) {
           const newTitle = data.title || '감정 탐험가';
+          
+          // 감정 색상 설정
+          if (data.color) {
+            console.log('🎨 EmotionTitle - 칭호 API에서 받은 색상:', data.color);
+            setEmotionColor(data.color);
+          }
           
           // 칭호가 변경되었는지 확인 (첫 로드가 아닌 경우에만)
           if (previousTitleRef.current && previousTitleRef.current !== newTitle) {
@@ -97,12 +125,16 @@ export default function EmotionTitle() {
   };
 
   if (loading) {
+    const color1 = hexToRgba(emotionColor, 0.85);
+    const colorLight = adjustColorBrightness(emotionColor, 30);
+    const color2 = hexToRgba(colorLight, 0.85);
+    
     return (
       <div style={{
-        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+        background: `linear-gradient(135deg, ${color1} 0%, ${color2} 100%)`,
         borderRadius: 16,
         padding: '32px 40px',
-        boxShadow: '0 8px 32px rgba(102, 126, 234, 0.4)',
+        boxShadow: `0 8px 32px ${emotionColor}66`,
         textAlign: 'center',
         color: '#fff'
       }}>
@@ -113,12 +145,16 @@ export default function EmotionTitle() {
     );
   }
 
+  const colorLight = adjustColorBrightness(emotionColor, 30);
+  const color1 = hexToRgba(emotionColor, 0.85);
+  const color2 = hexToRgba(colorLight, 0.85);
+
   return (
     <div style={{
-      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+      background: `linear-gradient(135deg, ${color1} 0%, ${color2} 100%)`,
       borderRadius: 16,
       padding: '32px 40px',
-      boxShadow: '0 8px 32px rgba(102, 126, 234, 0.4)',
+      boxShadow: `0 8px 32px ${emotionColor}66`,
       position: 'relative',
       overflow: 'hidden'
     }}>

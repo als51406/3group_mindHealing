@@ -305,7 +305,7 @@ app.get('/api/diary/today-emotion', authMiddleware, async (req: any, res) => {
   try {
     const client = await getClient();
     const db = client.db(DB_NAME);
-    const sessions = db.collection('diarySessions');
+    const sessions = db.collection('diary_sessions');
     
     const userId = req.user.sub;
     const today = new Date();
@@ -315,14 +315,23 @@ app.get('/api/diary/today-emotion', authMiddleware, async (req: any, res) => {
     
     // 오늘 작성된 일기 중 감정 정보가 있는 것 찾기
     const session = await sessions.findOne({
-      userId: new ObjectId(userId),
-      date: {
-        $gte: today.toISOString(),
-        $lt: tomorrow.toISOString()
+      userId: userId,
+      createdAt: {
+        $gte: today,
+        $lt: tomorrow
       },
       'mood.emotion': { $exists: true }
     }, {
       sort: { lastUpdatedAt: -1 }
+    });
+    
+    console.log('📊 오늘의 감정 조회:', {
+      userId,
+      session: session ? {
+        emotion: session.mood?.emotion,
+        color: session.mood?.color,
+        score: session.mood?.score
+      } : null
     });
     
     if (!session || !session.mood) {
@@ -2285,6 +2294,8 @@ app.get('/api/user/emotion-title', authMiddleware, async (req: any, res) => {
       return res.json({ 
         ok: true, 
         title: '감정 탐험가',
+        emotion: '기쁨',
+        color: EMOTION_COLORS_EARLY['기쁨'] || '#FFE066',
         description: '아직 충분한 대화 기록이 없습니다. 더 많은 대화를 나눠보세요!'
       });
     }
@@ -2301,6 +2312,10 @@ app.get('/api/user/emotion-title', authMiddleware, async (req: any, res) => {
     const totalCount = sessions.length;
     const topEmotion = Object.entries(emotionCount)
       .sort((a, b) => b[1] - a[1])[0];
+    
+    // 주 감정의 색상 코드 가져오기
+    const topEmotionName = topEmotion[0];
+    const topEmotionColor = EMOTION_COLORS_EARLY[topEmotionName] || '#a78bfa';
     
     // OpenAI로 칭호 생성
     const emotionSummary = Object.entries(emotionCount)
@@ -2335,6 +2350,8 @@ ${emotionSummary}
     res.json({ 
       ok: true, 
       title,
+      emotion: topEmotionName,
+      color: topEmotionColor,
       emotionSummary,
       totalSessions: totalCount
     });

@@ -123,7 +123,7 @@ export default function Navigation() {
                         }}
                         title="프로필 설정"
                     >
-                        {user.nickname || user.email}
+                        {user.nickname || user.email}{" 님"}
                     </span>
             <button onClick={onLogout}>로그아웃</button>
                 </>
