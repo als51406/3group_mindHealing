@@ -340,20 +340,41 @@ export default function Online() {
     });
 
     // 서버 -> 클라이언트 (matched)
-    client.on("matched", (data) => {
+    client.on("matched", async (data) => {
 
       // 서버에서 받은 방 ID 저장
       setRoomId(data.roomId);
       
-      // 상대방 프로필 설정 (임시로 기본 프로필 사용)
-      setPartnerProfile({
-        id: 'partner',
-        nickname: data.partnerNickname || '상대방',
-        title: '당신의 파트너',
-        profileImage: '',
-        todayEmotion: data.partnerEmotion || undefined,
-        topEmotions: [],
-      });
+      // 상대방의 전체 프로필 정보 로드
+      try {
+        // 상대방의 감정 통계 가져오기 (API 필요 시)
+        const partnerEmotionStats = data.partnerEmotionStats || [];
+        
+        setPartnerProfile({
+          id: data.partnerId || 'partner',
+          nickname: data.partnerNickname || '상대방',
+          title: data.partnerTitle || '당신의 파트너',
+          profileImage: data.partnerProfileImage || '',
+          todayEmotion: data.partnerEmotion || undefined,
+          topEmotions: partnerEmotionStats.slice(0, 3).map((stat: any, index: number) => ({
+            rank: index + 1,
+            emotion: stat.emotion || stat._id,
+            count: stat.count,
+            color: stat.color
+          })),
+        });
+      } catch (error) {
+        console.error('상대방 프로필 로드 실패:', error);
+        // 기본 프로필 설정
+        setPartnerProfile({
+          id: 'partner',
+          nickname: data.partnerNickname || '상대방',
+          title: '당신의 파트너',
+          profileImage: '',
+          todayEmotion: data.partnerEmotion || undefined,
+          topEmotions: [],
+        });
+      }
 
       // <2> 챗온 채팅 중 안내 메시지 변경
       setMatchingMessage("찾았습니다!!");
@@ -613,21 +634,53 @@ export default function Online() {
 
       {/* <4> 챗온 채팅 페이지 -시작- */}
       {displayChat && (
-        <div style={{ maxWidth: 720, margin: '0 auto', padding: '24px 16px' }}>
+        <div style={{ width: '100%', maxWidth: 1400, margin: '0 auto', padding: '24px 16px' }}>
 
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', margin: '8px 0 16px' }}>
-            <h2 style={{ textAlign: 'center', margin: 0, flex: 1 }}>온라인 채팅</h2>
-          </div>
+          {/* 메인 컨테이너: 프로필 - 채팅 - 프로필 */}
+          <div style={{
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'flex-start',
+            gap: 20,
+            flexWrap: 'wrap',
+          }}>
+            {/* 왼쪽: 상대방 프로필 */}
+            <div style={{ 
+              flex: '0 0 auto',
+              width: '100%',
+              maxWidth: '300px',
+              minWidth: '250px',
+            }}>
+              {partnerProfile && (
+                <>
+                  <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 8, color: '#6B7280' }}>상대방</div>
+                  <ProfileCard profile={partnerProfile} compact />
+                </>
+              )}
+            </div>
 
-          <div
-            style={{
-              padding: 16,
-              display: 'grid',
-              gridTemplateRows: '1fr auto', // 상단: 메시지 목록 / 하단: 입력창
-              gap: 12,
-              height: 'calc(100vh - 250px)', // 전체 높이 맞춤
-            }}
-          >
+            {/* 중앙: 채팅 영역 */}
+            <div style={{ 
+              flex: '1 1 600px',
+              minWidth: 0,
+              maxWidth: '700px',
+              display: 'flex',
+              flexDirection: 'column',
+            }}>
+              {/* 채팅 제목 */}
+              <h2 style={{ textAlign: 'center', margin: '0 0 16px 0' }}>온라인 채팅</h2>
+
+              {/* 채팅창 */}
+              <div
+                style={{
+                  padding: 16,
+                  display: 'grid',
+                  gridTemplateRows: '1fr auto',
+                  gap: 12,
+                  height: 'calc(100vh - 200px)',
+                  minHeight: '400px',
+                }}
+              >
             {/* 💬 메시지 목록 영역 */}
             <div
               style={{
@@ -719,6 +772,26 @@ export default function Online() {
               </button>
             </form>
           </div>
+          {/* 채팅 영역 끝 */}
+        </div>
+
+        {/* 오른쪽: 내 프로필 */}
+        <div style={{ 
+          flex: '0 0 auto',
+          width: '100%',
+          maxWidth: '300px',
+          minWidth: '250px',
+        }}>
+          {myProfile && (
+            <>
+              <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 8, color: '#6B7280', textAlign: 'right' }}>나</div>
+              <ProfileCard profile={myProfile} compact />
+            </>
+          )}
+        </div>
+      </div>
+      {/* 메인 컨테이너 끝 */}
+
         </div>
       )}
       {/* <4> 챗온 채팅 페이지 -끝- */}

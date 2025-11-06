@@ -1,8 +1,9 @@
 .profile-card {
   position: relative;
-  width: 450px;
-  max-width: 100%;
-  height: 240px;
+  width: 100%;
+  max-width: 450px;
+  height: auto;
+  min-height: 250px;
   border-radius: 30px;
   overflow: hidden;
   
@@ -31,9 +32,24 @@
 }
 
 .profile-card.compact {
-  width: 360px;
-  max-width: 100%;
-  height: 200px;
+  width: 100%;
+  max-width: 360px;
+  height: auto;
+  min-height: 200px;
+}
+
+/* 반응형: 작은 화면 */
+@media (max-width: 768px) {
+  .profile-card {
+    max-width: 100%;
+    height: auto;
+    min-height: 220px;
+  }
+  
+  .profile-card.compact {
+    max-width: 100%;
+    min-height: 200px;
+  }
 }
 
 /* 배경 그라데이션 (감정 색상) - 연기 효과 */
@@ -130,18 +146,28 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 10px 24px;
-  min-height: 70px;
+  padding: 10px 24px 8px 24px;
+  min-height: 60px;
+}
+
+.profile-card.compact .profile-section-top {
+  padding: 8px 20px 6px 20px;
+  min-height: 55px;
 }
 
 /* 하단 섹션: 이미지 + 정보 */
 .profile-section-bottom {
-  flex: 0 0 auto;  /* flex: 1에서 변경 - 내용물 크기만큼만 차지 */
+  flex: 1;
   display: flex;
   flex-direction: row;
   align-items: center;
-  padding: 0px 24px 24px 24px;
+  padding: 8px 24px 20px 24px;
   gap: 20px;
+}
+
+.profile-card.compact .profile-section-bottom {
+  padding: 6px 20px 18px 20px;
+  gap: 16px;
 }
 
 /* 프로필 이미지 */
@@ -263,8 +289,12 @@
   display: flex;
   flex-direction: column;
   justify-content: center;
-  gap: 8px;
+  gap: 6px;
   min-width: 0;
+}
+
+.profile-card.compact .profile-info-right {
+  gap: 4px;
 }
 
 /* 닉네임 */
@@ -295,14 +325,15 @@
 .profile-top-emotions {
   display: flex;
   flex-direction: row;
-  gap: 6px;
-  margin-top: 4px;
+  gap: 8px;
+  margin-top: 6px;
+  flex-wrap: wrap;
 }
 
 .emotion-rank-item {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
 }
 
 .emotion-medal {
@@ -311,12 +342,13 @@
 }
 
 .emotion-name {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
   text-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  max-width: 60px;
 }
 
 .profile-card.compact .emotion-medal {
@@ -325,6 +357,12 @@
 
 .profile-card.compact .emotion-name {
   font-size: 12px;
+  max-width: 50px;
+}
+
+.profile-card.compact .profile-top-emotions {
+  gap: 6px;
+  margin-top: 4px;
 }
 
 /* 칭호 */
@@ -391,29 +429,35 @@
   font-size: 11px;
 }
 
-/* 반응형 */
+/* 반응형: 작은 화면 */
 @media (max-width: 768px) {
   .profile-card {
-    width: 100%;
-    max-width: 380px;
-    height: 160px;
+    max-width: 100%;
+    height: auto;
+    min-height: 180px;
   }
   
   .profile-card.compact {
-    max-width: 300px;
-    height: 130px;
+    max-width: 100%;
+    min-height: 160px;
+  }
+  
+  .profile-section-bottom {
+    padding: 0px 16px 16px 16px;
+    gap: 12px;
   }
   
   .profile-image,
   .profile-avatar-placeholder {
-    width: 80px;
-    height: 80px;
+    width: 90px;
+    height: 90px;
   }
   
   .profile-card.compact .profile-image,
   .profile-card.compact .profile-avatar-placeholder {
-    width: 60px;
-    height: 60px;
+    width: 70px;
+    height: 70px;
+    font-size: 28px;
   }
   
   .profile-nickname {
@@ -424,8 +468,53 @@
     font-size: 16px;
   }
   
-  .profile-card-content {
-    padding: 20px;
-    gap: 16px;
+  .profile-title-top {
+    font-size: 14px;
+    padding: 10px 16px;
+  }
+  
+  .profile-card.compact .profile-title-top {
+    font-size: 12px;
+    padding: 8px 12px;
+  }
+  
+  .emotion-medal {
+    font-size: 16px;
+  }
+  
+  .emotion-name {
+    font-size: 12px;
+  }
+  
+  .profile-card.compact .emotion-medal {
+    font-size: 14px;
+  }
+  
+  .profile-card.compact .emotion-name {
+    font-size: 11px;
+  }
+}
+
+/* 반응형: 매우 작은 화면 */
+@media (max-width: 480px) {
+  .profile-section-bottom {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    padding: 12px;
+  }
+  
+  .profile-info-right {
+    align-items: center;
+    width: 100%;
+  }
+  
+  .profile-nickname {
+    text-align: center;
+  }
+  
+  .profile-top-emotions {
+    justify-content: center;
+    flex-wrap: wrap;
   }
 }

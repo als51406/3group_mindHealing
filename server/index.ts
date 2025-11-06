@@ -3349,8 +3349,95 @@ server.on("connection", (client) => {
       roomUsers.set(roomId, [waitingUser, client.id]);
 
       // (1번 이벤트 루프를 건너뛴 다음) 두 클라이언트에게 matched 이벤트 보내기 (1대1 채팅 매칭 성공)
-      setTimeout(() => {
-        server.to(roomId).emit("matched", { roomId, users: [waitingUser, client.id] });
+      setTimeout(async () => {
+        if (!waitingUser) return;
+        
+        // 두 사용자의 프로필 정보 가져오기
+        const waitingUserSocket = server.sockets.sockets.get(waitingUser);
+        const currentUserSocket = client;
+        
+        const waitingUserEmail = waitingUserSocket?.handshake.auth.email;
+        const currentUserEmail = currentUserSocket?.handshake.auth.email;
+        
+        let waitingUserProfile: any = {};
+        let currentUserProfile: any = {};
+        
+        try {
+          const mongoClient = await getClient();
+          const db = mongoClient.db(DB_NAME);
+          const usersCol = db.collection('users');
+          
+          // 대기 중이던 사용자의 프로필 정보
+          if (waitingUserEmail) {
+            const user = await usersCol.findOne({ email: waitingUserEmail });
+            if (user) {
+              waitingUserProfile = {
+                partnerId: waitingUser,
+                partnerNickname: user.nickname,
+                partnerTitle: user.title || '마음을 나누는 사람',
+                partnerProfileImage: user.profileImage || '',
+              };
+              
+              // 감정 통계 가져오기
+              const emotionStats = await db.collection('diary_sessions')
+                .aggregate([
+                  { $match: { email: waitingUserEmail } },
+                  { $group: { _id: '$emotion', count: { $sum: 1 } } },
+                  { $sort: { count: -1 } },
+                  { $limit: 3 }
+                ]).toArray();
+              
+              waitingUserProfile.partnerEmotionStats = emotionStats.map((stat: any) => ({
+                emotion: stat._id,
+                count: stat.count,
+                color: EMOTION_COLORS_EARLY[stat._id as keyof typeof EMOTION_COLORS_EARLY] || '#a78bfa'
+              }));
+            }
+          }
+          
+          // 현재 사용자의 프로필 정보
+          if (currentUserEmail) {
+            const user = await usersCol.findOne({ email: currentUserEmail });
+            if (user) {
+              currentUserProfile = {
+                partnerId: client.id,
+                partnerNickname: user.nickname,
+                partnerTitle: user.title || '마음을 나누는 사람',
+                partnerProfileImage: user.profileImage || '',
+              };
+              
+              // 감정 통계 가져오기
+              const emotionStats = await db.collection('diary_sessions')
+                .aggregate([
+                  { $match: { email: currentUserEmail } },
+                  { $group: { _id: '$emotion', count: { $sum: 1 } } },
+                  { $sort: { count: -1 } },
+                  { $limit: 3 }
+                ]).toArray();
+              
+              currentUserProfile.partnerEmotionStats = emotionStats.map((stat: any) => ({
+                emotion: stat._id,
+                count: stat.count,
+                color: EMOTION_COLORS_EARLY[stat._id as keyof typeof EMOTION_COLORS_EARLY] || '#a78bfa'
+              }));
+            }
+          }
+        } catch (error) {
+          console.error('프로필 정보 로드 실패:', error);
+        }
+        
+        // 각 사용자에게 상대방의 프로필 정보 전송
+        waitingUserSocket?.emit("matched", { 
+          roomId, 
+          users: [waitingUser, client.id],
+          ...currentUserProfile 
+        });
+        
+        currentUserSocket?.emit("matched", { 
+          roomId, 
+          users: [waitingUser, client.id],
+          ...waitingUserProfile 
+        });
       }, 0)
 
       // -log-
