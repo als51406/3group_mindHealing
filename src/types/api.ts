@@ -85,3 +85,21 @@ export interface BarTooltipFormatterProps {
   payload?: BarTooltipPayload;
   [key: string]: unknown;
 }
+
+// 프로필 관련 타입
+export interface UserProfile {
+  id: string;
+  nickname: string;
+  title?: string;
+  profileImage?: string;
+  todayEmotion?: {
+    emotion: string;
+    color: string;
+    score: number;
+  };
+}
+
+export interface ProfileCardProps {
+  profile: UserProfile;
+  compact?: boolean;
+}

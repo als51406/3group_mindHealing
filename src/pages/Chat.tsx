@@ -15,7 +15,7 @@ import type { EnhancedMood, EmotionDetail } from '../types/api';
 const Chat: React.FC = () => {
     const navigate = useNavigate(); // 로그인 안 된 사용자를 리다이렉트하기 위해 사용
     const location = useLocation(); // Home에서 전달된 state를 받기 위해 사용
-    const { user, loading } = useAuth(); // 로그인 상태 확인
+    const { user } = useAuth(); // 로그인 상태 확인
     const { showToast, ToastContainer } = useToast(); // Toast 알림
     const [msgs, setMsgs] = useState<AiMsg[]>([
         // 초기 메시지(첫 인사)
@@ -238,10 +238,10 @@ const Chat: React.FC = () => {
     };
 
     // 로그인 상태 확인: 로그인 안 되어 있으면 /login으로 이동
-    useEffect(() => {
-        if (loading) return; // 아직 로딩 중이면 대기
-        if (!user) navigate('/login'); // 로그인 안 되어 있으면 로그인 페이지로
-    }, [loading, user, navigate]);
+    // useEffect(() => {
+    //     if (loading) return; // 아직 로딩 중이면 대기
+    //     if (!user) navigate('/login'); // 로그인 안 되어 있으면 로그인 페이지로
+    // }, [loading, user, navigate]);
 
     // 메시지가 변경될 때마다(추가될 때마다) 자동으로 스크롤 아래로 이동
     useEffect(() => {

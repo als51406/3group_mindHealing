@@ -322,34 +322,59 @@ app.post('/api/chat', authMiddleware, async (req: any, res) => {
 });
 
 // AI Chat proxy: POST /api/ai/chat { messages: [{role, content}], model? }
-app.post('/api/ai/chat', authMiddleware, async (req: any, res) => {
+app.post('/api/ai/chat', async (req: any, res) => {
   try {
-    if (!OPENAI_API_KEY) return res.status(500).json({ message: 'OPENAI_API_KEY 미설정' });
+    if (!OPENAI_API_KEY) {
+      return res.status(500).json({ message: 'OPENAI_API_KEY 미설정' });
+    }
+
     const { messages, model } = req.body || {};
     if (!Array.isArray(messages) || messages.length === 0) {
       return res.status(400).json({ message: 'messages 배열이 필요합니다.' });
     }
+
+    // OpenAI 호출
     const openai = new OpenAI({ apiKey: OPENAI_API_KEY });
-  const resp = await chatCompletionWithFallback(
+    const resp = await chatCompletionWithFallback(
       openai,
-      messages.map((m: any) => ({ role: m.role, content: String(m.content) })),
+      messages.map((m: any) => ({
+        role: m.role,
+        content: String(m.content),
+      })),
       model
     );
-  const content = (resp as any)?.choices?.[0]?.message?.content ?? '';
-    // persist user last message + assistant reply
-    try {
-      const client = await getClient();
-      const db = client.db(DB_NAME);
-      const userId = req.user.sub;
-      const last = messages[messages.length - 1];
-      if (last?.role === 'user') {
-        await db.collection('ai_messages').insertOne({ userId, role: 'user', content: String(last.content || ''), createdAt: new Date() });
-      }
-      await db.collection('ai_messages').insertOne({ userId, role: 'assistant', content, createdAt: new Date() });
+
+    const content = (resp as any)?.choices?.[0]?.message?.content ?? '';
+
+    // ✅ 로그인된 유저일 때만 DB 저장 시도
+    if (req.user?.sub) {
+      try {
+        const client = await getClient();
+        const db = client.db(DB_NAME);
+        const userId = req.user.sub;
+        const last = messages[messages.length - 1];
+
+        if (last?.role === 'user') {
+          await db.collection('ai_messages').insertOne({
+            userId,
+            role: 'user',
+            content: String(last.content || ''),
+            createdAt: new Date(),
+          });
+        }
+
+        await db.collection('ai_messages').insertOne({
+          userId,
+          role: 'assistant',
+          content,
+          createdAt: new Date(),
+        });
       } catch (persistErr) {
-      console.warn('persist ai_messages failed:', (persistErr as Error).message);
+        console.warn('persist ai_messages failed:', (persistErr as Error).message);
+      }
     }
-    // respond to the client with the assistant content
+
+    // ✅ 클라이언트로 AI의 응답 반환
     return res.json({ ok: true, content });
   } catch (e: unknown) {
     console.error('AI chat error:', e instanceof Error ? e.message : String(e));
@@ -377,60 +402,76 @@ app.get('/api/ai/history', authMiddleware, async (req: any, res) => {
 });
 
 // AI emotion analysis: POST /api/ai/analyze-emotion { text }
-app.post('/api/ai/analyze-emotion', authMiddleware, async (req: any, res) => {
+app.post('/api/ai/analyze-emotion', async (req: any, res) => {
   try {
-    if (!OPENAI_API_KEY) return res.status(500).json({ message: 'OPENAI_API_KEY 미설정' });
-    
+    if (!OPENAI_API_KEY) {
+      return res.status(500).json({ message: 'OPENAI_API_KEY 미설정' });
+    }
+
     const { text, enhanced } = req.body || {};
     if (!text || typeof text !== 'string' || !text.trim()) {
       return res.status(400).json({ message: '분석할 텍스트가 필요합니다.' });
     }
-    
-    const client = await getClient();
-    const db = client.db(DB_NAME);
-    const userId = req.user.sub;
-    
-    // enhanced=true이면 복합 감정 분석 사용
+
+    let userId: string | null = null;
+    let db: any = null;
+
+    // ✅ 로그인되어 있을 경우에만 사용자 정보와 DB 연결
+    if (req.user?.sub) {
+      userId = req.user.sub;
+      const client = await getClient();
+      db = client.db(DB_NAME);
+    }
+
+    // ✅ enhanced=true이면 복합 감정 분석
     if (enhanced) {
-      // 이전 감정 데이터 가져오기 (최근 10개)
-      const previousSessions = await db
-        .collection('diary_sessions')
-        .find({ userId })
-        .sort({ createdAt: -1 })
-        .limit(10)
-        .project({ mood: 1, enhancedMood: 1 })
-        .toArray();
-      
-      const previousMoods = previousSessions
-        .map((s: any) => s.enhancedMood || s.mood)
-        .filter(Boolean);
-      
-      // 복합 감정 분석 실행
+      let previousMoods: any[] = [];
+
+      // 로그인된 사용자일 때만 과거 감정 데이터 활용
+      if (userId && db) {
+        const previousSessions = await db
+          .collection('diary_sessions')
+          .find({ userId })
+          .sort({ createdAt: -1 })
+          .limit(10)
+          .project({ mood: 1, enhancedMood: 1 })
+          .toArray();
+
+        previousMoods = previousSessions
+          .map((s: any) => s.enhancedMood || s.mood)
+          .filter(Boolean);
+      }
+
       const enhancedMood = await detectEnhancedEmotion(text, previousMoods);
-      
-      // 기존 mood 형식도 함께 반환 (하위 호환성)
+
       const simpleMood = {
         emotion: enhancedMood.primary.emotion,
-        score: enhancedMood.primary.score / 100, // 0-1 스케일로 변환
-        color: enhancedMood.primary.color
+        score: enhancedMood.primary.score / 100, // 0~1 스케일 변환
+        color: enhancedMood.primary.color,
       };
-      
-      res.json({ ok: true, mood: simpleMood, enhancedMood });
-    } else {
-      // 기존 단일 감정 분석
-      const mood = await detectEmotionFromText(text);
-      
-      // 개인화된 색상 적용
-      const personalizedColor = await personalizedColorForEmotion(db, userId, mood.color, mood.emotion);
-      const finalMood = { ...mood, color: personalizedColor };
-      
-      res.json({ ok: true, mood: finalMood });
+
+      return res.json({ ok: true, mood: simpleMood, enhancedMood });
     }
+
+    // ✅ 기존 단일 감정 분석
+    const mood = await detectEmotionFromText(text);
+
+    let finalColor = mood.color;
+
+    // 로그인된 경우 → 개인화된 색상 적용
+    if (userId && db) {
+      finalColor = await personalizedColorForEmotion(db, userId, mood.color, mood.emotion);
+    }
+
+    const finalMood = { ...mood, color: finalColor };
+    return res.json({ ok: true, mood: finalMood });
+
   } catch (e: any) {
     console.error('감정 분석 API 오류:', e?.message || e);
     res.status(500).json({ message: '감정 분석 중 오류가 발생했습니다.' });
   }
 });
+
 
 // GET /api/emotion/history?days=7 - 감정 히스토리 조회
 app.get('/api/emotion/history', authMiddleware, async (req: any, res) => {
