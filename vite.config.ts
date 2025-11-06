@@ -5,17 +5,15 @@ import react from '@vitejs/plugin-react'
 export default defineConfig({
   plugins: [react()],
   server: {
+    host: '0.0.0.0', // 네트워크에서 접근 가능하도록 설정
+    port: 5173,
     proxy: {
       '/api': {
-        target: 'http://localhost:7780',
+        target: 'http://localhost:7780', // localhost로 변경 (같은 기기일 때)
         changeOrigin: true,
         secure: false,
       },
-      '/socket.io': {
-        target: 'http://localhost:7780',
-        changeOrigin: true,
-        ws: true, // WebSocket 지원
-      },
+      // Socket.IO는 프록시 사용 안 함 (클라이언트에서 직접 연결)
     },
   },
   build: {

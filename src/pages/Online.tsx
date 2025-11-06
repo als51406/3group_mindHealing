@@ -13,8 +13,31 @@ import './Online.css';
 
 export default function Online() {
 
-  // 서버 주소: Vite 프록시를 통해 자동으로 연결 (개발: localhost, 프로덕션: 환경변수)
-  const serverLink = import.meta.env.VITE_SOCKET_SERVER_URL || "";
+  // 서버 주소: 환경에 따라 자동 설정
+  // - 로컬 개발 (localhost): http://localhost:7780
+  // - 네트워크 환경 (192.168.x.x): http://192.168.x.x:7780
+  const getServerUrl = () => {
+    // 환경변수에 명시적으로 설정된 경우
+    if (import.meta.env.VITE_SOCKET_SERVER_URL && import.meta.env.VITE_SOCKET_SERVER_URL !== '') {
+      return import.meta.env.VITE_SOCKET_SERVER_URL;
+    }
+    
+    // 현재 호스트 기반 자동 감지
+    const currentHost = window.location.hostname;
+    const protocol = window.location.protocol; // http: or https:
+    
+    // localhost나 127.0.0.1인 경우
+    if (currentHost === 'localhost' || currentHost === '127.0.0.1') {
+      return `${protocol}//localhost:7780`;
+    }
+    
+    // 네트워크 IP로 접속한 경우 (같은 IP의 7780 포트로 연결)
+    return `${protocol}//${currentHost}:7780`;
+  };
+  
+  const serverLink = getServerUrl();
+  console.log('🌐 Socket.IO 서버 연결 주소:', serverLink);
+  console.log('📍 현재 페이지 주소:', window.location.href);
 
   // navigate: 페이지를 이동할 때 사용
   const navigate = useNavigate();
@@ -356,6 +379,7 @@ export default function Online() {
       reconnectionAttempts: 5, // 최대 재연결 시도 횟수
       reconnectionDelay: 1000, // 재연결 지연 시간 (ms)
       timeout: 10000, // 연결 타임아웃 (ms)
+      withCredentials: true, // 쿠키 전송 활성화
       auth: {
         email: user.email || ''
       }
@@ -365,7 +389,7 @@ export default function Online() {
 
     // 서버 -> 클라이언트 (connect)
     client.on("connect", () => {
-      console.log(`✅ 서버에 연결되었습니다: ${client.id}`);
+      console.log(`✅ 서버에 연결되었습니다: ${client.id}, 이메일: ${user.email}`);
     });
     
     // 연결 오류 처리
@@ -396,7 +420,15 @@ export default function Online() {
     // 서버 -> 클라이언트 (matched)
     client.on("matched", async (data) => {
 
-      console.log('🎉 매칭 성공:', data);
+      console.log('🎉 매칭 성공 - 받은 데이터:', JSON.stringify(data, null, 2));
+      console.log('📋 데이터 필드:', {
+        partnerId: data.partnerId,
+        partnerNickname: data.partnerNickname,
+        partnerTitle: data.partnerTitle,
+        partnerEmotion: data.partnerEmotion,
+        partnerEmotionStats: data.partnerEmotionStats,
+        partnerEmotionStatsLength: data.partnerEmotionStats?.length
+      });
 
       // 서버에서 받은 방 ID 저장
       setRoomId(data.roomId);
@@ -406,8 +438,10 @@ export default function Online() {
         // 서버에서 받은 기본 프로필 정보
         const partnerEmotionStats = data.partnerEmotionStats || [];
         
+        console.log('🔍 감정 통계 처리:', partnerEmotionStats);
+        
         // 상대방의 상세 프로필 설정
-        setPartnerProfile({
+        const profileData = {
           id: data.partnerId || 'partner',
           nickname: data.partnerNickname || '상대방',
           title: data.partnerTitle || '마음을 나누는 사람',
@@ -423,7 +457,10 @@ export default function Online() {
             count: stat.count,
             color: stat.color || '#a78bfa'
           })),
-        });
+        };
+        
+        console.log('✅ 설정할 프로필 데이터:', profileData);
+        setPartnerProfile(profileData);
         
         console.log('상대방 프로필 로드 완료:', {
           nickname: data.partnerNickname,

@@ -3393,7 +3393,15 @@ const httpServer = http.createServer(app);
 
 // socket.io 서버 생성
 // cors를 *로 설정시 모든 도메인에서 접속 가능
-const server = new Server(httpServer, { cors: { origin: "*" } });
+const server = new Server(httpServer, { 
+  cors: { 
+    origin: "*",
+    methods: ["GET", "POST"],
+    credentials: true
+  },
+  transports: ['websocket', 'polling'], // WebSocket과 polling 모두 지원
+  allowEIO3: true // Engine.IO v3 클라이언트 지원
+});
 
 // waitingUser: 현재 매칭을 기다리고 있는 사용자
 let waitingUser: string | null = null;
@@ -3456,10 +3464,35 @@ server.on("connection", (client) => {
         const waitingUserSocket = server.sockets.sockets.get(savedWaitingUser);
         const currentUserSocket = client;
         
-        const waitingUserEmail = waitingUserSocket?.handshake.auth.email;
-        const currentUserEmail = currentUserSocket?.handshake.auth.email;
+        // 쿠키에서 userId 추출하는 함수
+        const getUserIdFromSocket = (socket: any): string | null => {
+          try {
+            const cookies = socket.handshake.headers.cookie;
+            if (!cookies) {
+              console.log('⚠️ 쿠키 없음');
+              return null;
+            }
+            
+            const tokenMatch = cookies.match(/token=([^;]+)/);
+            if (!tokenMatch) {
+              console.log('⚠️ 토큰 없음');
+              return null;
+            }
+            
+            const token = tokenMatch[1];
+            const decoded = jwt.verify(token, JWT_SECRET) as { sub: string; email: string };
+            console.log('🔓 JWT 디코딩 성공:', { sub: decoded.sub, email: decoded.email });
+            return decoded.sub; // 'sub'가 userId임
+          } catch (error) {
+            console.error('❌ userId 추출 실패:', error);
+            return null;
+          }
+        };
         
-        console.log('📧 이메일 확인:', { waitingUserEmail, currentUserEmail });
+        const waitingUserId = getUserIdFromSocket(waitingUserSocket);
+        const currentUserId = getUserIdFromSocket(currentUserSocket);
+        
+        console.log('� userId 확인:', { waitingUserId, currentUserId });
         
         let waitingUserProfile: any = {};
         let currentUserProfile: any = {};
@@ -3470,12 +3503,12 @@ server.on("connection", (client) => {
           const usersCol = db.collection('users');
           
           // 대기 중이던 사용자의 프로필 정보
-          if (waitingUserEmail) {
-            const user = await usersCol.findOne({ email: waitingUserEmail });
+          if (waitingUserId) {
+            const user = await usersCol.findOne({ _id: new ObjectId(waitingUserId) });
             if (user) {
               waitingUserProfile = {
-                partnerId: waitingUser,
-                partnerEmail: waitingUserEmail,
+                partnerId: savedWaitingUser,
+                partnerEmail: user.email,
                 partnerNickname: user.nickname,
                 partnerTitle: user.title || '마음을 나누는 사람',
                 partnerProfileImage: user.profileImage || '',
@@ -3484,7 +3517,7 @@ server.on("connection", (client) => {
               // 감정 통계 가져오기 (userId 사용, mood.emotion 필드 참조)
               const emotionStats = await db.collection('diary_sessions')
                 .aggregate([
-                  { $match: { userId: String(user._id), 'mood.emotion': { $exists: true, $ne: null } } },
+                  { $match: { userId: waitingUserId, 'mood.emotion': { $exists: true, $ne: null } } },
                   { $group: { _id: '$mood.emotion', count: { $sum: 1 } } },
                   { $sort: { count: -1 } },
                   { $limit: 3 }
@@ -3506,12 +3539,12 @@ server.on("connection", (client) => {
           }
           
           // 현재 사용자의 프로필 정보
-          if (currentUserEmail) {
-            const user = await usersCol.findOne({ email: currentUserEmail });
+          if (currentUserId) {
+            const user = await usersCol.findOne({ _id: new ObjectId(currentUserId) });
             if (user) {
               currentUserProfile = {
                 partnerId: client.id,
-                partnerEmail: currentUserEmail,
+                partnerEmail: user.email,
                 partnerNickname: user.nickname,
                 partnerTitle: user.title || '마음을 나누는 사람',
                 partnerProfileImage: user.profileImage || '',
@@ -3520,7 +3553,7 @@ server.on("connection", (client) => {
               // 감정 통계 가져오기 (userId 사용, mood.emotion 필드 참조)
               const emotionStats = await db.collection('diary_sessions')
                 .aggregate([
-                  { $match: { userId: String(user._id), 'mood.emotion': { $exists: true, $ne: null } } },
+                  { $match: { userId: currentUserId, 'mood.emotion': { $exists: true, $ne: null } } },
                   { $group: { _id: '$mood.emotion', count: { $sum: 1 } } },
                   { $sort: { count: -1 } },
                   { $limit: 3 }
@@ -3547,22 +3580,28 @@ server.on("connection", (client) => {
         console.log('📤 matched 이벤트 전송:', {
           waitingUser: savedWaitingUser,
           currentUser: client.id,
-          waitingUserProfile: Object.keys(waitingUserProfile),
-          currentUserProfile: Object.keys(currentUserProfile)
+          waitingUserProfile: waitingUserProfile,
+          currentUserProfile: currentUserProfile
         });
         
         // 각 사용자에게 상대방의 프로필 정보 전송
-        waitingUserSocket?.emit("matched", { 
+        const waitingUserData = { 
           roomId, 
           users: [savedWaitingUser, client.id],
           ...currentUserProfile 
-        });
+        };
         
-        currentUserSocket?.emit("matched", { 
+        const currentUserData = { 
           roomId, 
           users: [savedWaitingUser, client.id],
           ...waitingUserProfile 
-        });
+        };
+        
+        console.log('👥 대기 중이던 사용자에게 전송:', waitingUserData);
+        console.log('👤 현재 사용자에게 전송:', currentUserData);
+        
+        waitingUserSocket?.emit("matched", waitingUserData);
+        currentUserSocket?.emit("matched", currentUserData);
         
         console.log('✅ matched 이벤트 전송 완료');
       }, 0)
@@ -3731,8 +3770,11 @@ async function checkEmotionsOnStartup() {
     // 감정 데이터 체크 실행
     await checkEmotionsOnStartup();
     
-    httpServer.listen(PORT, () => {
-      console.log(`API server listening on http://localhost:${PORT} (db: ${DB_NAME})`);
+    // 네트워크에서 접근 가능하도록 0.0.0.0으로 바인딩
+    httpServer.listen(PORT, '0.0.0.0', () => {
+      console.log(`✅ API server listening on http://0.0.0.0:${PORT} (db: ${DB_NAME})`);
+      console.log(`🌐 Network access: http://192.168.4.8:${PORT}`);
+      console.log(`🏠 Local access: http://localhost:${PORT}`);
     });
   } catch (e) {
     console.error('서버 시작 실패: DB 연결 확인 필요:', (e as Error).message);
