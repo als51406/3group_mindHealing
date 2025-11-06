@@ -238,10 +238,10 @@ const Chat: React.FC = () => {
     };
 
     // 로그인 상태 확인: 로그인 안 되어 있으면 /login으로 이동
-    useEffect(() => {
-        if (loading) return; // 아직 로딩 중이면 대기
-        if (!user) navigate('/login'); // 로그인 안 되어 있으면 로그인 페이지로
-    }, [loading, user, navigate]);
+    // useEffect(() => {
+    //     if (loading) return; // 아직 로딩 중이면 대기
+    //     if (!user) navigate('/login'); // 로그인 안 되어 있으면 로그인 페이지로
+    // }, [loading, user, navigate]);
 
     // 메시지가 변경될 때마다(추가될 때마다) 자동으로 스크롤 아래로 이동
     useEffect(() => {
