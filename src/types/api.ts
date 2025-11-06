@@ -92,6 +92,13 @@ export interface UserProfile {
   nickname: string;
   title?: string;
   profileImage?: string;
+  bio?: string;  // 소개글
+  topEmotions?: Array<{  // 감정 TOP3
+    rank: number;
+    emotion: string;
+    color: string;
+    count: number;
+  }>;
   todayEmotion?: {
     emotion: string;
     color: string;

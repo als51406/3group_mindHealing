@@ -38,47 +38,60 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
       
       {/* 카드 내용 */}
       <div className="profile-card-content">
-        {/* 프로필 이미지 */}
-        <div className="profile-image-wrapper">
-          {profile.profileImage ? (
-            <img 
-              src={profile.profileImage} 
-              alt={profile.nickname}
-              className="profile-image"
-            />
-          ) : (
-            <div className="profile-avatar-placeholder">
-              {getInitial(profile.nickname)}
+        {/* 상단 섹션: 칭호 */}
+        <div className="profile-section-top">
+          {profile.title && (
+            <div className="profile-title-top">
+              {profile.title}
             </div>
           )}
-          {showOnline && <div className="profile-online-indicator" />}
         </div>
         
-        {/* 닉네임 */}
-        <h3 className="profile-nickname">{profile.nickname}</h3>
-        
-        {/* 칭호 */}
-        {profile.title && (
-          <div className="profile-title">
-            {profile.title}
+        {/* 하단 섹션: 이미지 + 정보 */}
+        <div className="profile-section-bottom">
+          {/* 왼쪽: 프로필 이미지 */}
+          <div className="profile-image-wrapper">
+            {profile.profileImage ? (
+              <img 
+                src={profile.profileImage} 
+                alt={profile.nickname}
+                className="profile-image"
+              />
+            ) : (
+              <div className="profile-avatar-placeholder">
+                {getInitial(profile.nickname)}
+              </div>
+            )}
+            {showOnline && <div className="profile-online-indicator" />}
           </div>
-        )}
-        
-        {/* 오늘의 감정 */}
-        {profile.todayEmotion && (
-          <div className="profile-emotion-tag">
-            <div 
-              className="emotion-color-dot"
-              style={{ 
-                background: emotionColor,
-                boxShadow: `0 0 8px ${emotionColor}`
-              }}
-            />
-            <span className="emotion-label">
-              {profile.todayEmotion.emotion}
-            </span>
+          
+          {/* 오른쪽: 닉네임 + 감정 TOP3 */}
+          <div className="profile-info-right">
+            {/* 닉네임 (위) */}
+            <h3 className="profile-nickname">{profile.nickname}</h3>
+            
+            {/* 감정 TOP3 (아래) */}
+            {profile.topEmotions && profile.topEmotions.length > 0 && (
+              <div className="profile-top-emotions">
+                {profile.topEmotions.slice(0, 3).map((item) => (
+                  <div key={item.rank} className="emotion-rank-item">
+                    <span className="emotion-medal">
+                      {item.rank === 1 && '🥇'}
+                      {item.rank === 2 && '🥈'}
+                      {item.rank === 3 && '🥉'}
+                    </span>
+                    <span 
+                      className="emotion-name"
+                      style={{ color: item.color }}
+                    >
+                      {item.emotion}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
-        )}
+        </div>
       </div>
     </div>
   );

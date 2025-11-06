@@ -276,7 +276,17 @@ app.get('/api/me', authMiddleware, async (req: any, res) => {
     const users = db.collection('users');
     const me = await users.findOne({ _id: new (await import('mongodb')).ObjectId(req.user.sub) });
     if (!me) return res.status(404).json({ message: '사용자를 찾을 수 없습니다.' });
-    return res.json({ ok: true, user: { id: String(me._id), email: me.email } });
+    return res.json({ 
+      ok: true, 
+      user: { 
+        id: String(me._id), 
+        email: me.email,
+        nickname: me.nickname || me.email?.split('@')[0] || 'User',
+        title: me.title || '',
+        profileImage: me.profileImage || '',
+        bio: me.bio || ''
+      } 
+    });
   } catch (e) {
     return res.status(500).json({ message: '서버 오류가 발생했습니다.' });
   }
@@ -286,6 +296,147 @@ app.get('/api/me', authMiddleware, async (req: any, res) => {
 app.post('/api/logout', (req, res) => {
   res.clearCookie('token', { path: '/' });
   res.json({ ok: true });
+});
+
+// ==================== 프로필 API ====================
+
+// 오늘의 감정 조회
+app.get('/api/diary/today-emotion', authMiddleware, async (req: any, res) => {
+  try {
+    const client = await getClient();
+    const db = client.db(DB_NAME);
+    const sessions = db.collection('diarySessions');
+    
+    const userId = req.user.sub;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    
+    // 오늘 작성된 일기 중 감정 정보가 있는 것 찾기
+    const session = await sessions.findOne({
+      userId: new ObjectId(userId),
+      date: {
+        $gte: today.toISOString(),
+        $lt: tomorrow.toISOString()
+      },
+      'mood.emotion': { $exists: true }
+    }, {
+      sort: { lastUpdatedAt: -1 }
+    });
+    
+    if (!session || !session.mood) {
+      return res.json({ emotion: null });
+    }
+    
+    return res.json({
+      emotion: {
+        emotion: session.mood.emotion,
+        color: session.mood.color,
+        score: session.mood.score || 0
+      }
+    });
+  } catch (e) {
+    console.error('오늘의 감정 조회 실패:', e);
+    return res.status(500).json({ message: '서버 오류가 발생했습니다.' });
+  }
+});
+
+// 프로필 업데이트
+app.put('/api/profile/update', authMiddleware, async (req: any, res) => {
+  try {
+    const client = await getClient();
+    const db = client.db(DB_NAME);
+    const users = db.collection('users');
+    
+    const userId = req.user.sub;
+    const { nickname, title, profileImage, bio } = req.body;
+    
+    const updateData: any = {};
+    if (nickname !== undefined) updateData.nickname = nickname;
+    if (title !== undefined) updateData.title = title;
+    if (profileImage !== undefined) updateData.profileImage = profileImage;
+    if (bio !== undefined) updateData.bio = bio;
+    
+    const result = await users.updateOne(
+      { _id: new ObjectId(userId) },
+      { $set: updateData }
+    );
+    
+    if (result.matchedCount === 0) {
+      return res.status(404).json({ message: '사용자를 찾을 수 없습니다.' });
+    }
+    
+    return res.json({ ok: true, message: '프로필이 업데이트되었습니다.' });
+  } catch (e) {
+    console.error('프로필 업데이트 실패:', e);
+    return res.status(500).json({ message: '서버 오류가 발생했습니다.' });
+  }
+});
+
+// 비밀번호 변경
+app.put('/api/profile/change-password', authMiddleware, async (req: any, res) => {
+  try {
+    const client = await getClient();
+    const db = client.db(DB_NAME);
+    const users = db.collection('users');
+    
+    const userId = req.user.sub;
+    const { currentPassword, newPassword } = req.body;
+    
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ message: '현재 비밀번호와 새 비밀번호를 모두 입력해주세요.' });
+    }
+    
+    // 현재 사용자 조회
+    const user = await users.findOne({ _id: new ObjectId(userId) });
+    if (!user) {
+      return res.status(404).json({ message: '사용자를 찾을 수 없습니다.' });
+    }
+    
+    // 현재 비밀번호 확인
+    const isMatch = await bcrypt.compare(currentPassword, user.passwordHash);
+    if (!isMatch) {
+      return res.status(401).json({ message: '현재 비밀번호가 일치하지 않습니다.' });
+    }
+    
+    // 새 비밀번호 해싱
+    const newPasswordHash = await bcrypt.hash(newPassword, 10);
+    
+    // 비밀번호 업데이트
+    await users.updateOne(
+      { _id: new ObjectId(userId) },
+      { $set: { passwordHash: newPasswordHash } }
+    );
+    
+    return res.json({ ok: true, message: '비밀번호가 성공적으로 변경되었습니다.' });
+  } catch (e) {
+    console.error('비밀번호 변경 실패:', e);
+    return res.status(500).json({ message: '서버 오류가 발생했습니다.' });
+  }
+});
+
+// 이미지 업로드 (임시: base64 저장)
+app.post('/api/profile/upload-image', authMiddleware, async (req: any, res) => {
+  try {
+    // 실제 프로덕션에서는 AWS S3, Cloudinary 등 사용 권장
+    // 여기서는 간단히 base64를 DB에 저장하는 방식으로 구현
+    const { image } = req.body;
+    
+    if (!image || !image.startsWith('data:image/')) {
+      return res.status(400).json({ message: '유효한 이미지가 아닙니다.' });
+    }
+    
+    // 실제로는 파일 시스템이나 클라우드 스토리지에 저장하고 URL 반환
+    // 임시로 base64 그대로 반환
+    return res.json({ 
+      ok: true, 
+      imageUrl: image  // 실제로는 저장된 이미지의 URL
+    });
+  } catch (e) {
+    console.error('이미지 업로드 실패:', e);
+    return res.status(500).json({ message: '서버 오류가 발생했습니다.' });
+  }
 });
 
 // 채팅 메시지 저장/조회 (사용자별)

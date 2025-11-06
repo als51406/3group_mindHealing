@@ -66,6 +66,17 @@ export function useAuth() {
 
   useEffect(() => {
     refresh();
+    
+    // 프로필 업데이트 이벤트 리스너 추가
+    const handleProfileUpdate = () => {
+      refresh();
+    };
+    
+    window.addEventListener('profileUpdated', handleProfileUpdate);
+    
+    return () => {
+      window.removeEventListener('profileUpdated', handleProfileUpdate);
+    };
   }, [refresh]);
 
   return { user, loading, error, refresh, logout };

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import ProfileCard from '../components/ProfileCard';
 import type { UserProfile } from '../types/api';
@@ -6,57 +6,99 @@ import './Profile.css';
 
 const Profile: React.FC = () => {
   const { user } = useAuth();
-  const fileInputRef = useRef<HTMLInputElement>(null);
   
   const [profile, setProfile] = useState<UserProfile>({
     id: user?.id || '',
     nickname: user?.nickname || user?.email?.split('@')[0] || 'User',
-    title: user?.title || '',
+    title: '',  // 칭호는 localStorage에서 가져옴
     profileImage: user?.profileImage || '',
     todayEmotion: undefined,
   });
   
-  const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [uploadingImage, setUploadingImage] = useState(false);
+  const [bio, setBio] = useState('');
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [changingPassword, setChangingPassword] = useState(false);
 
-  // 오늘의 감정 가져오기
+  // 프로필 로드 (bio 및 감정 TOP3 포함)
   useEffect(() => {
-    if (!user?.id) return;
-    
-    const fetchTodayEmotion = async () => {
+    const loadProfile = async () => {
       try {
-        setIsLoading(true);
-        const res = await fetch('/api/diary/today-emotion', {
-          credentials: 'include',
-        });
-        
+        // 기본 프로필 정보 로드
+        const res = await fetch('/api/me', { credentials: 'include' });
         if (res.ok) {
           const data = await res.json();
-          if (data.emotion) {
+          if (data.user) {
+            setBio(data.user.bio || '');
             setProfile(prev => ({
               ...prev,
-              todayEmotion: {
-                emotion: data.emotion.emotion,
-                color: data.emotion.color,
-                score: data.emotion.score,
-              }
+              bio: data.user.bio || '',
+            }));
+          }
+        }
+
+        // 감정 TOP3 로드
+        const statsRes = await fetch('/api/user/emotion-stats', {
+          credentials: 'include'
+        });
+        if (statsRes.ok) {
+          const statsData = await statsRes.json();
+          if (statsData.ok && statsData.topEmotions) {
+            setProfile(prev => ({
+              ...prev,
+              topEmotions: statsData.topEmotions.slice(0, 3),
             }));
           }
         }
       } catch (error) {
-        console.error('Failed to fetch today emotion:', error);
-      } finally {
-        setIsLoading(false);
+        console.error('프로필 로드 실패:', error);
       }
     };
-    
-    fetchTodayEmotion();
-  }, [user?.id]);
+
+    loadProfile();
+  }, []);
+
+  // localStorage에서 칭호 가져오기
+  useEffect(() => {
+    const loadTitleFromCache = () => {
+      const cached = localStorage.getItem('emotion_title_cache');
+      if (cached) {
+        try {
+          const { title } = JSON.parse(cached);
+          setProfile(prev => ({ ...prev, title: title || '' }));
+        } catch (e) {
+          console.error('칭호 로드 실패:', e);
+        }
+      }
+    };
+
+    loadTitleFromCache();
+
+    // 칭호가 업데이트될 때마다 감지
+    const handleTitleUpdate = () => {
+      loadTitleFromCache();
+    };
+
+    window.addEventListener('titleUpdated', handleTitleUpdate);
+    window.addEventListener('storage', handleTitleUpdate);
+
+    return () => {
+      window.removeEventListener('titleUpdated', handleTitleUpdate);
+      window.removeEventListener('storage', handleTitleUpdate);
+    };
+  }, []);
 
   // 프로필 저장
   const handleSave = async () => {
     if (!user?.id) return;
+    
+    // 닉네임 8글자 제한
+    if (profile.nickname.length > 8) {
+      alert('닉네임은 최대 8글자까지 입력 가능합니다.');
+      return;
+    }
     
     try {
       setIsSaving(true);
@@ -66,12 +108,44 @@ const Profile: React.FC = () => {
         credentials: 'include',
         body: JSON.stringify({
           nickname: profile.nickname,
-          title: profile.title,
+          bio: bio,
           profileImage: profile.profileImage,
         }),
       });
       
       if (!res.ok) throw new Error('Failed to save profile');
+      
+      // 저장 성공 후 프로필 다시 로드하여 상태 업데이트
+      const meRes = await fetch('/api/me', { credentials: 'include' });
+      if (meRes.ok) {
+        const data = await meRes.json();
+        if (data.user) {
+          setProfile(prev => ({
+            ...prev,
+            nickname: data.user.nickname,
+            profileImage: data.user.profileImage || '',
+            bio: data.user.bio || '',
+          }));
+          setBio(data.user.bio || '');
+          
+          // Navigation의 useAuth도 업데이트되도록 storage 이벤트 발생
+          window.dispatchEvent(new Event('profileUpdated'));
+        }
+      }
+
+      // 감정 TOP3도 다시 로드
+      const statsRes = await fetch('/api/user/emotion-stats', {
+        credentials: 'include'
+      });
+      if (statsRes.ok) {
+        const statsData = await statsRes.json();
+        if (statsData.ok && statsData.topEmotions) {
+          setProfile(prev => ({
+            ...prev,
+            topEmotions: statsData.topEmotions.slice(0, 3),
+          }));
+        }
+      }
       
       alert('프로필이 저장되었습니다!');
     } catch (error) {
@@ -82,172 +156,241 @@ const Profile: React.FC = () => {
     }
   };
 
-  // 이미지 업로드
-  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    
-    // 파일 크기 체크 (5MB)
-    if (file.size > 5 * 1024 * 1024) {
-      alert('파일 크기는 5MB 이하여야 합니다.');
+  // 비밀번호 변경
+  const handlePasswordChange = async () => {
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      alert('모든 필드를 입력해주세요.');
       return;
     }
-    
-    // 이미지 타입 체크
-    if (!file.type.startsWith('image/')) {
-      alert('이미지 파일만 업로드 가능합니다.');
-      return;
-    }
-    
-    try {
-      setUploadingImage(true);
-      const formData = new FormData();
-      formData.append('image', file);
-      
-      const res = await fetch('/api/profile/upload-image', {
-        method: 'POST',
-        credentials: 'include',
-        body: formData,
-      });
-      
-      if (!res.ok) throw new Error('Failed to upload image');
-      
-      const data = await res.json();
-      setProfile(prev => ({
-        ...prev,
-        profileImage: data.imageUrl,
-      }));
-    } catch (error) {
-      console.error('Upload image error:', error);
-      alert('이미지 업로드에 실패했습니다.');
-    } finally {
-      setUploadingImage(false);
-    }
-  };
 
-  const getInitial = (name: string) => {
-    return name.charAt(0).toUpperCase();
+    if (newPassword !== confirmPassword) {
+      alert('새 비밀번호가 일치하지 않습니다.');
+      return;
+    }
+
+    try {
+      setChangingPassword(true);
+      const res = await fetch('/api/profile/change-password', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          currentPassword,
+          newPassword,
+        }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.message || 'Failed to change password');
+      }
+
+      alert('비밀번호가 변경되었습니다!');
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+    } catch (error: any) {
+      console.error('Change password error:', error);
+      alert(error.message || '비밀번호 변경에 실패했습니다.');
+    } finally {
+      setChangingPassword(false);
+    }
   };
 
   return (
-    <div className="profile-page">
-      <div className="profile-container">
-        <div className="profile-header">
-          <h1>프로필 설정</h1>
-          <p>다른 사용자에게 보여질 프로필을 설정하세요</p>
+    <div style={{
+      maxWidth: '1000px',
+      margin: '0 auto',
+      padding: '30px 20px',
+    }}>
+      <h1>프로필 관리</h1>
+      
+      {/* 섹션 1: 프로필 미리보기 */}
+      <div style={{
+        backgroundColor: 'white',
+        borderRadius: '12px',
+        padding: '24px',
+        marginBottom: '24px',
+        boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
+      }}>
+        <h2 style={{ marginBottom: '20px', color: '#333' }}>프로필 미리보기</h2>
+        <div style={{ display: 'flex', justifyContent: 'center' }}>
+          <ProfileCard profile={{ ...profile, bio }} showOnline={true} />
         </div>
-        
-        <div className="profile-content">
-          {/* 프리뷰 */}
-          <div className="profile-preview-section">
-            <div className="preview-label">프로필 미리보기</div>
-            <ProfileCard profile={profile} showOnline={true} />
-          </div>
+      </div>
+
+      {/* 섹션 2: 프로필 수정 */}
+      <div style={{
+        backgroundColor: 'white',
+        borderRadius: '12px',
+        padding: '24px',
+        marginBottom: '24px',
+        boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
+      }}>
+        <h2 style={{ marginBottom: '20px', color: '#333' }}>프로필 수정</h2>
+
+        {/* 닉네임 변경 */}
+        <div style={{ marginBottom: '30px' }}>
+          <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '8px', color: '#555' }}>
+            닉네임 ({profile.nickname.length}/8)
+          </label>
+          <input
+            type="text"
+            value={profile.nickname}
+            onChange={(e) => {
+              if (e.target.value.length <= 8) {
+                setProfile({ ...profile, nickname: e.target.value });
+              }
+            }}
+            maxLength={8}
+            style={{
+              width: '100%',
+              padding: '10px',
+              fontSize: '16px',
+              border: '1px solid #ddd',
+              borderRadius: '8px',
+              boxSizing: 'border-box',
+            }}
+          />
+        </div>
+
+        {/* 소개란 */}
+        <div style={{ marginBottom: '30px' }}>
+          <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '8px', color: '#555' }}>
+            소개 (자기만 보기)
+          </label>
+          <textarea
+            value={bio}
+            onChange={(e) => setBio(e.target.value)}
+            placeholder="자기소개를 작성해보세요..."
+            style={{
+              width: '100%',
+              padding: '10px',
+              fontSize: '16px',
+              border: '1px solid #ddd',
+              borderRadius: '8px',
+              minHeight: '100px',
+              resize: 'vertical',
+              boxSizing: 'border-box',
+            }}
+          />
+        </div>
+
+        {/* 비밀번호 변경 */}
+        <div style={{ marginBottom: '20px', paddingTop: '20px', borderTop: '1px solid #eee' }}>
+          <h3 style={{ marginBottom: '16px', color: '#555', fontSize: '18px' }}>비밀번호 변경</h3>
           
-          {/* 편집 폼 */}
-          <div className="profile-edit-form">
-            {/* 프로필 이미지 */}
-            <div className="form-group">
-              <label className="form-label">프로필 이미지</label>
-              <div className="image-upload-section">
-                {profile.profileImage ? (
-                  <img 
-                    src={profile.profileImage} 
-                    alt="Profile" 
-                    className="current-image-preview"
-                  />
-                ) : (
-                  <div className="avatar-preview-placeholder">
-                    {getInitial(profile.nickname)}
-                  </div>
-                )}
-                <button 
-                  type="button"
-                  className="upload-button"
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={uploadingImage}
-                >
-                  {uploadingImage ? '업로드 중...' : '이미지 변경'}
-                </button>
-                <input 
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/*"
-                  className="file-input-hidden"
-                  onChange={handleImageUpload}
-                />
-              </div>
-            </div>
-            
-            {/* 닉네임 */}
-            <div className="form-group">
-              <label className="form-label">닉네임 *</label>
-              <input 
-                type="text"
-                className="form-input"
-                value={profile.nickname}
-                onChange={(e) => setProfile(prev => ({ ...prev, nickname: e.target.value }))}
-                placeholder="닉네임을 입력하세요"
-                maxLength={20}
-                required
-              />
-            </div>
-            
-            {/* 칭호 */}
-            <div className="form-group">
-              <label className="form-label">칭호</label>
-              <input 
-                type="text"
-                className="form-input"
-                value={profile.title || ''}
-                onChange={(e) => setProfile(prev => ({ ...prev, title: e.target.value }))}
-                placeholder="예: 감정 탐험가, 마음의 정원사"
-                maxLength={30}
-              />
-            </div>
-            
-            {/* 오늘의 감정 */}
-            <div className="form-group">
-              <label className="form-label">오늘의 감정</label>
-              {isLoading ? (
-                <div className="today-emotion-display">
-                  <p style={{ margin: 0, color: '#6b7280' }}>감정 데이터 불러오는 중...</p>
-                </div>
-              ) : profile.todayEmotion ? (
-                <div className="today-emotion-display">
-                  <div className="emotion-info">
-                    <div 
-                      className="emotion-color-preview"
-                      style={{ backgroundColor: profile.todayEmotion.color }}
-                    />
-                    <div className="emotion-details">
-                      <p className="emotion-name">{profile.todayEmotion.emotion}</p>
-                      <p className="emotion-description">
-                        오늘 일기를 작성하면 자동으로 감정이 분석됩니다
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <div className="today-emotion-display">
-                  <p style={{ margin: 0, color: '#6b7280' }}>
-                    아직 오늘의 감정이 없습니다. 일기를 작성해보세요!
-                  </p>
-                </div>
-              )}
-            </div>
-            
-            {/* 저장 버튼 */}
-            <button 
-              type="button"
-              className="save-button"
-              onClick={handleSave}
-              disabled={isSaving || !profile.nickname.trim()}
-            >
-              {isSaving ? '저장 중...' : '프로필 저장'}
-            </button>
+          <div style={{ marginBottom: '16px' }}>
+            <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '8px', color: '#555' }}>
+              현재 비밀번호
+            </label>
+            <input
+              type="password"
+              value={currentPassword}
+              onChange={(e) => setCurrentPassword(e.target.value)}
+              style={{
+                width: '100%',
+                padding: '10px',
+                fontSize: '16px',
+                border: '1px solid #ddd',
+                borderRadius: '8px',
+                boxSizing: 'border-box',
+              }}
+            />
           </div>
+
+          <div style={{ marginBottom: '16px' }}>
+            <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '8px', color: '#555' }}>
+              새 비밀번호
+            </label>
+            <input
+              type="password"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              style={{
+                width: '100%',
+                padding: '10px',
+                fontSize: '16px',
+                border: '1px solid #ddd',
+                borderRadius: '8px',
+                boxSizing: 'border-box',
+              }}
+            />
+          </div>
+
+          <div style={{ marginBottom: '16px' }}>
+            <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '8px', color: '#555' }}>
+              새 비밀번호 확인
+            </label>
+            <input
+              type="password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              style={{
+                width: '100%',
+                padding: '10px',
+                fontSize: '16px',
+                border: '1px solid #ddd',
+                borderRadius: '8px',
+                boxSizing: 'border-box',
+              }}
+            />
+          </div>
+
+          <button
+            onClick={handlePasswordChange}
+            disabled={changingPassword}
+            style={{
+              padding: '10px 20px',
+              fontSize: '16px',
+              backgroundColor: changingPassword ? '#ccc' : '#667eea',
+              color: 'white',
+              border: 'none',
+              borderRadius: '8px',
+              cursor: changingPassword ? 'not-allowed' : 'pointer',
+            }}
+          >
+            {changingPassword ? '변경 중...' : '비밀번호 변경'}
+          </button>
         </div>
+
+        {/* 저장 버튼 */}
+        <button
+          onClick={handleSave}
+          disabled={isSaving}
+          style={{
+            width: '100%',
+            padding: '12px',
+            fontSize: '18px',
+            backgroundColor: isSaving ? '#ccc' : '#667eea',
+            color: 'white',
+            border: 'none',
+            borderRadius: '8px',
+            cursor: isSaving ? 'not-allowed' : 'pointer',
+            fontWeight: 'bold',
+            marginTop: '20px',
+          }}
+        >
+          {isSaving ? '저장 중...' : '프로필 저장'}
+        </button>
+      </div>
+
+      {/* 섹션 3: 도움말 */}
+      <div style={{
+        backgroundColor: '#f9fafb',
+        borderRadius: '12px',
+        padding: '24px',
+        boxShadow: '0 2px 8px rgba(0, 0, 0, 0.05)',
+      }}>
+        <h2 style={{ marginBottom: '16px', color: '#333' }}>📌 도움말</h2>
+        <ul style={{ lineHeight: '1.8', color: '#666', paddingLeft: '20px' }}>
+          <li><strong>프로필 미리보기:</strong> 다른 사용자에게 보여지는 내 프로필 카드입니다.</li>
+          <li><strong>닉네임:</strong> 매칭 및 채팅에서 표시되는 이름입니다.</li>
+          <li><strong>칭호:</strong> History 페이지에서 일기 작성 기록에 따라 자동으로 부여됩니다.</li>
+          <li><strong>감정:</strong> 오늘 작성한 일기의 감정이 표시됩니다.</li>
+          <li><strong>소개:</strong> 자기만 볼 수 있는 비공개 메모입니다.</li>
+          <li><strong>비밀번호 변경:</strong> 현재 비밀번호를 입력 후 새 비밀번호를 설정할 수 있습니다.</li>
+        </ul>
       </div>
     </div>
   );
