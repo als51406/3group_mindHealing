@@ -4,6 +4,7 @@
 import { useNavigate } from "react-router-dom";
 import { useState } from "react";
 import { useToast } from "../components/Toast";
+import "../styles/Login.css";
 
 export default function Login() {
 
@@ -13,6 +14,19 @@ export default function Login() {
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [loading, setLoading] = useState(false);
+
+    // 커스텀 validation 메시지 설정
+    const handleEmailInvalid = (e: React.InvalidEvent<HTMLInputElement>) => {
+        e.target.setCustomValidity('이메일 주소를 입력해주세요.');
+    };
+
+    const handlePasswordInvalid = (e: React.InvalidEvent<HTMLInputElement>) => {
+        e.target.setCustomValidity('비밀번호를 입력해주세요.');
+    };
+
+    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        e.target.setCustomValidity('');
+    };
 
     // back: 뒤로가기 버튼
     const back = () => {
@@ -54,41 +68,84 @@ export default function Login() {
     return (
         <>
             <ToastContainer />
-            <div style={{ width: '100%', minHeight: 'calc(100vh - 56px)', display: 'grid', placeItems: 'center', background: 'linear-gradient(180deg, #f9fafb 0%, #eef2ff 100%)' }}>
-                <div className="auth-container" style={{ width: 'min(420px, 92%)', background: '#fff', border: '1px solid #e5e7eb', borderRadius: 12, padding: 20, boxShadow: '0 10px 30px rgba(0,0,0,0.06)' }}>
-                    <div className="auth-title" style={{ fontSize: 18, fontWeight: 800, marginBottom: 12 }}>로그인</div>
-                    <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                        <label htmlFor="login-email" style={{ fontSize: 12, color: '#374151' }}>이메일</label>
-                        <input
-                            id="login-email"
-                            name="email"
-                            type="email"
-                            value={email}
-                            onChange={(e) => setEmail(e.target.value)}
-                            placeholder="you@example.com"
-                            required
-                            autoComplete="email"
-                            style={{ padding: '10px 12px', border: '1px solid #e5e7eb', borderRadius: 8 }}
-                        />
-                        <label htmlFor="login-password" style={{ fontSize: 12, color: '#374151' }}>비밀번호</label>
-                        <input
-                            id="login-password"
-                            name="password"
-                            type="password"
-                            value={password}
-                            onChange={(e) => setPassword(e.target.value)}
-                            placeholder="••••••••"
-                            required
-                            autoComplete="current-password"
-                            style={{ padding: '10px 12px', border: '1px solid #e5e7eb', borderRadius: 8 }}
-                        />
-                        <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
-                            <button className="auth-button" type="submit" disabled={loading} style={{ padding: '10px 14px', borderRadius: 8, border: '1px solid #2563eb', background: loading ? '#93c5fd' : '#2563eb', color: '#fff', cursor: loading ? 'not-allowed' : 'pointer', flex: 1 }}>
+            <div className="login-wrapper">
+                <div className="login-container">
+                    <h1 className="login-title">토닥톡</h1>
+                    
+                    <div className="login-tabs">
+                        <button className="login-tab active">이메일 로그인</button>
+                        <button className="login-tab">QR 로그인</button>
+                    </div>
+
+                    <form onSubmit={handleSubmit} className="login-form">
+                        <div className="form-group">
+                            <input
+                                id="login-email"
+                                name="email"
+                                type="email"
+                                value={email}
+                                onChange={(e) => {
+                                    setEmail(e.target.value);
+                                    handleInputChange(e);
+                                }}
+                                onInvalid={handleEmailInvalid}
+                                placeholder="이메일 주소"
+                                required
+                                autoComplete="email"
+                                className="form-input"
+                            />
+                            <label htmlFor="login-email" className="form-label">이메일 주소</label>
+                        </div>
+                        <div className="form-group">
+                            <input
+                                id="login-password"
+                                name="password"
+                                type="password"
+                                value={password}
+                                onChange={(e) => {
+                                    setPassword(e.target.value);
+                                    handleInputChange(e);
+                                }}
+                                onInvalid={handlePasswordInvalid}
+                                placeholder="비밀번호"
+                                required
+                                autoComplete="current-password"
+                                className="form-input"
+                            />
+                            <label htmlFor="login-password" className="form-label">비밀번호</label>
+                        </div>
+                        <div className="button-group">
+                            <button className="btn-primary" type="submit" disabled={loading}>
                                 {loading ? '로그인 중...' : '로그인'}
                             </button>
-                            <button className="auth-button" type="button" onClick={back} style={{ padding: '10px 14px', borderRadius: 8, border: '1px solid #d1d5db', background: '#f9fafb', flex: 1 }}>뒤로</button>
+                            <button className="btn-secondary" type="button" onClick={back}>
+                                뒤로
+                            </button>
                         </div>
                     </form>
+
+                    <div className="login-links">
+                        <a href="/register" className="login-link">회원가입</a>
+                        <span className="link-divider">|</span>
+                        <a href="#" className="login-link">아이디 찾기</a>
+                        <span className="link-divider">|</span>
+                        <a href="#" className="login-link">비밀번호 찾기</a>
+                    </div>
+
+                    <div className="sns-login">
+                        <div className="sns-buttons">
+                            <button className="sns-button naver" type="button">
+                                N
+                            </button>
+                            <button className="sns-button google" type="button">
+                                G
+                            </button>
+                            <button className="sns-button kakao" type="button">
+                                K
+                            </button>
+                        </div>
+                        <p className="sns-text">SNS 계정으로 간편로그인하세요.</p>
+                    </div>
                 </div>
             </div>
         </>

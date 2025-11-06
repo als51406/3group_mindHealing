@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>토닥톡 디자인 시스템 데모</title>
+  <link rel="stylesheet" href="src/styles/theme.css">
+  <style>
+    body {
+      font-family: var(--font-main);
+      background: var(--color-background);
+      padding: var(--spacing-4xl);
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    .section {
+      background: var(--color-white);
+      padding: var(--spacing-3xl);
+      margin-bottom: var(--spacing-3xl);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-md);
+    }
+
+    .section-title {
+      font-size: var(--font-size-title);
+      font-weight: var(--font-weight-bold);
+      color: var(--text-primary);
+      margin-bottom: var(--spacing-2xl);
+      border-bottom: 2px solid var(--color-border);
+      padding-bottom: var(--spacing-lg);
+    }
+
+    .color-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: var(--spacing-lg);
+    }
+
+    .color-box {
+      text-align: center;
+    }
+
+    .color-swatch {
+      width: 100%;
+      height: 80px;
+      border-radius: var(--radius-md);
+      margin-bottom: var(--spacing-sm);
+      border: 1px solid var(--color-border);
+    }
+
+    .color-name {
+      font-size: var(--font-size-subcontent);
+      font-weight: var(--font-weight-medium);
+      color: var(--text-primary);
+    }
+
+    .color-value {
+      font-size: var(--font-size-caption);
+      color: var(--text-tertiary);
+      font-family: var(--font-number);
+    }
+
+    .typo-example {
+      margin-bottom: var(--spacing-xl);
+    }
+
+    .button-grid {
+      display: flex;
+      gap: var(--spacing-lg);
+      flex-wrap: wrap;
+    }
+
+    .demo-button {
+      padding: var(--spacing-lg) var(--spacing-2xl);
+      border-radius: var(--radius-md);
+      font-family: var(--font-main);
+      font-size: var(--font-size-content);
+      font-weight: var(--font-weight-medium);
+      cursor: pointer;
+      transition: var(--transition-all);
+      border: none;
+    }
+
+    .demo-button.primary {
+      background: var(--color-point);
+      color: var(--text-primary);
+    }
+
+    .demo-button.primary:hover {
+      background: var(--color-point-hover);
+      transform: translateY(-2px);
+      box-shadow: var(--shadow-md);
+    }
+
+    .demo-button.outline {
+      background: transparent;
+      color: var(--text-secondary);
+      border: 1px solid var(--color-border);
+    }
+
+    .demo-button.outline:hover {
+      background: var(--color-hover);
+      border-color: var(--color-point);
+    }
+
+    .spacing-grid {
+      display: grid;
+      gap: var(--spacing-lg);
+    }
+
+    .spacing-item {
+      display: flex;
+      align-items: center;
+      gap: var(--spacing-lg);
+    }
+
+    .spacing-box {
+      background: var(--color-point);
+      border-radius: var(--radius-sm);
+    }
+
+    .input-demo {
+      width: 100%;
+      max-width: 400px;
+      padding: var(--spacing-lg);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-md);
+      font-family: var(--font-main);
+      font-size: var(--font-size-content);
+      transition: var(--transition-all);
+    }
+
+    .input-demo:focus {
+      outline: none;
+      border-color: var(--color-point);
+      box-shadow: 0 0 0 3px rgba(193, 230, 241, 0.2);
+    }
+  </style>
+</head>
+<body>
+  <h1 class="text-h1" style="text-align: center; margin-bottom: var(--spacing-4xl);">
+    토닥톡 디자인 시스템 🎨
+  </h1>
+
+  <!-- Primary Colors -->
+  <div class="section">
+    <h2 class="section-title">Primary Colors (기본 색상)</h2>
+    <div class="color-grid">
+      <div class="color-box">
+        <div class="color-swatch" style="background: var(--color-background);"></div>
+        <div class="color-name">Background</div>
+        <div class="color-value">#FAF7F2</div>
+      </div>
+      <div class="color-box">
+        <div class="color-swatch" style="background: var(--color-text);"></div>
+        <div class="color-name">Text</div>
+        <div class="color-value">#1B2023</div>
+      </div>
+      <div class="color-box">
+        <div class="color-swatch" style="background: var(--color-background-sub);"></div>
+        <div class="color-name">Background Sub</div>
+        <div class="color-value">#DDDDDD</div>
+      </div>
+      <div class="color-box">
+        <div class="color-swatch" style="background: var(--color-point);"></div>
+        <div class="color-name">Point</div>
+        <div class="color-value">#C1E6F1</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Typography -->
+  <div class="section">
+    <h2 class="section-title">Typography (타이포그래피)</h2>
+    <div class="typo-example">
+      <h1 class="text-h1">h1 - 40px - 메인 제목</h1>
+    </div>
+    <div class="typo-example">
+      <h2 class="text-title">Title - 28px - 페이지 제목</h2>
+    </div>
+    <div class="typo-example">
+      <h3 class="text-subtitle">Subtitle - 20px - 서브 제목</h3>
+    </div>
+    <div class="typo-example">
+      <p class="text-content">Content - 16px - 본문 텍스트입니다. 이것은 일반적인 문단에 사용됩니다.</p>
+    </div>
+    <div class="typo-example">
+      <p class="text-subcontent">Subcontent - 14px - 작은 본문 텍스트입니다.</p>
+    </div>
+    <div class="typo-example">
+      <p class="text-caption">Caption - 12px - 캡션이나 주석에 사용됩니다.</p>
+    </div>
+  </div>
+
+  <!-- Buttons -->
+  <div class="section">
+    <h2 class="section-title">Buttons (버튼)</h2>
+    <div class="button-grid">
+      <button class="demo-button primary">Primary Button</button>
+      <button class="demo-button outline">Outline Button</button>
+      <button class="btn btn-point">포인트 버튼</button>
+      <button class="btn btn-outline">아웃라인 버튼</button>
+    </div>
+  </div>
+
+  <!-- Input Fields -->
+  <div class="section">
+    <h2 class="section-title">Input Fields (입력 필드)</h2>
+    <input type="text" class="input-demo" placeholder="이메일을 입력하세요">
+    <br><br>
+    <input type="password" class="input-demo" placeholder="비밀번호를 입력하세요">
+  </div>
+
+  <!-- Spacing -->
+  <div class="section">
+    <h2 class="section-title">Spacing (간격 시스템)</h2>
+    <div class="spacing-grid">
+      <div class="spacing-item">
+        <div class="spacing-box" style="width: var(--spacing-xs); height: 20px;"></div>
+        <span>xs - 4px</span>
+      </div>
+      <div class="spacing-item">
+        <div class="spacing-box" style="width: var(--spacing-sm); height: 20px;"></div>
+        <span>sm - 8px</span>
+      </div>
+      <div class="spacing-item">
+        <div class="spacing-box" style="width: var(--spacing-md); height: 20px;"></div>
+        <span>md - 12px</span>
+      </div>
+      <div class="spacing-item">
+        <div class="spacing-box" style="width: var(--spacing-lg); height: 20px;"></div>
+        <span>lg - 16px</span>
+      </div>
+      <div class="spacing-item">
+        <div class="spacing-box" style="width: var(--spacing-xl); height: 20px;"></div>
+        <span>xl - 20px</span>
+      </div>
+      <div class="spacing-item">
+        <div class="spacing-box" style="width: var(--spacing-2xl); height: 20px;"></div>
+        <span>2xl - 24px</span>
+      </div>
+      <div class="spacing-item">
+        <div class="spacing-box" style="width: var(--spacing-3xl); height: 20px;"></div>
+        <span>3xl - 32px</span>
+      </div>
+      <div class="spacing-item">
+        <div class="spacing-box" style="width: var(--spacing-4xl); height: 20px;"></div>
+        <span>4xl - 40px</span>
+      </div>
+      <div class="spacing-item">
+        <div class="spacing-box" style="width: var(--spacing-5xl); height: 20px;"></div>
+        <span>5xl - 48px</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Cards -->
+  <div class="section">
+    <h2 class="section-title">Cards (카드)</h2>
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: var(--spacing-xl);">
+      <div class="card">
+        <h3 style="margin-top: 0;">카드 제목</h3>
+        <p class="text-content">이것은 카드 컴포넌트입니다. 호버 시 그림자가 커집니다.</p>
+      </div>
+      <div class="card shadow-lg">
+        <h3 style="margin-top: 0;">큰 그림자 카드</h3>
+        <p class="text-content">shadow-lg 클래스가 적용된 카드입니다.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Shadows & Border Radius -->
+  <div class="section">
+    <h2 class="section-title">Shadows & Border Radius</h2>
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: var(--spacing-xl);">
+      <div style="padding: var(--spacing-lg); background: var(--color-white);" class="shadow-sm rounded-sm">
+        <div class="text-subcontent">shadow-sm</div>
+        <div class="text-caption">rounded-sm</div>
+      </div>
+      <div style="padding: var(--spacing-lg); background: var(--color-white);" class="shadow-md rounded-md">
+        <div class="text-subcontent">shadow-md</div>
+        <div class="text-caption">rounded-md</div>
+      </div>
+      <div style="padding: var(--spacing-lg); background: var(--color-white);" class="shadow-lg rounded-lg">
+        <div class="text-subcontent">shadow-lg</div>
+        <div class="text-caption">rounded-lg</div>
+      </div>
+      <div style="padding: var(--spacing-lg); background: var(--color-white); width: 80px; height: 80px; display: flex; align-items: center; justify-content: center;" class="shadow-md rounded-full">
+        <div class="text-subcontent">rounded-full</div>
+      </div>
+    </div>
+  </div>
+
+  <footer style="text-align: center; margin-top: var(--spacing-5xl); padding: var(--spacing-3xl); color: var(--text-tertiary);">
+    <p class="text-subcontent">토닥톡 디자인 시스템 v1.0.0</p>
+    <p class="text-caption">모든 스타일은 src/styles/theme.css에 정의되어 있습니다.</p>
+  </footer>
+</body>
+</html>
+

@@ -1,4 +1,5 @@
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import './styles/theme.css'; // 디자인 시스템 테마
 import './App.css';
 import './styles/responsive.css'; // 모바일 반응형 스타일
 import Navigation from './pages/Navigation';

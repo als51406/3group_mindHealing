@@ -1,0 +1,267 @@
+/* Register.css - 회원가입 페이지 스타일 */
+
+.register-wrapper {
+  width: 100%;
+  min-height: calc(100vh - 56px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-background);
+  padding: var(--spacing-xl);
+}
+
+.register-container {
+  width: min(450px, 100%);
+  background: var(--color-white);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-5xl) var(--spacing-4xl);
+  box-shadow: var(--shadow-md);
+}
+
+.register-title {
+  font-family: var(--font-main);
+  font-size: 32px;
+  font-weight: var(--font-weight-bold);
+  color: var(--text-primary);
+  margin-bottom: var(--spacing-2xl);
+  text-align: center;
+  letter-spacing: -0.5px;
+}
+
+.register-subtitle {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-align: center;
+  margin-bottom: var(--spacing-4xl);
+}
+
+.register-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+.register-form .form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  position: relative;
+}
+
+.register-form .form-label {
+  position: absolute;
+  left: 20px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-family: var(--font-main);
+  font-size: var(--font-size-content);
+  color: var(--color-secondary-gray);
+  pointer-events: none;
+  transition: all 0.3s ease;
+  background: var(--color-white);
+  padding: 0 4px;
+}
+
+.register-form .form-input {
+  width: 100%;
+  padding: 18px var(--spacing-xl);
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  font-family: var(--font-main);
+  font-size: var(--font-size-content);
+  font-weight: var(--font-weight-regular);
+  transition: var(--transition-all);
+  background: var(--color-white);
+  color: var(--color-secondary-gray);
+  outline: none;
+  box-sizing: border-box;
+}
+
+.register-form .form-input:focus {
+  border-color: #B7E7F3;
+  background: var(--color-white);
+  box-shadow: 0 0 0 3px rgba(183, 231, 243, 0.2);
+}
+
+.register-form .form-input::placeholder {
+  color: transparent;
+}
+
+/* Label이 위로 올라가는 효과 */
+.register-form .form-input:focus + .form-label,
+.register-form .form-input:not(:placeholder-shown) + .form-label {
+  top: -2px;
+  transform: translateY(-50%);
+  font-size: 12px;
+  color: #B7E7F3;
+  font-weight: var(--font-weight-medium);
+}
+
+.register-form .button-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-lg);
+  margin-top: var(--spacing-xl);
+}
+
+.register-form .btn-primary {
+  width: 100%;
+  padding: 18px var(--spacing-xl);
+  border: none;
+  border-radius: var(--radius-xl);
+  font-family: var(--font-main);
+  font-size: var(--font-size-content);
+  font-weight: var(--font-weight-medium);
+  background: var(--color-point);
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: var(--transition-all);
+}
+
+.register-form .btn-primary:hover:not(:disabled) {
+  background: var(--color-secondary-purple);
+}
+
+.register-form .btn-primary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.register-form .btn-secondary {
+  width: 100%;
+  padding: 18px var(--spacing-xl);
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  font-family: var(--font-main);
+  font-size: var(--font-size-content);
+  font-weight: var(--font-weight-medium);
+  background: var(--color-white);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: var(--transition-all);
+}
+
+.register-form .btn-secondary:hover {
+  background: var(--color-hover);
+}
+
+/* 약관 동의 섹션 */
+.agreement-section {
+  margin-top: var(--spacing-xl);
+  padding: var(--spacing-xl);
+  background: var(--color-white);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+}
+
+.agreement-item {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  padding: var(--spacing-md) 0;
+}
+
+.agreement-item.agreement-all {
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
+}
+
+.agreement-divider {
+  height: 1px;
+  background: var(--color-border);
+  margin: var(--spacing-sm) 0;
+}
+
+.agreement-checkbox {
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--color-border);
+  border-radius: 4px;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  position: relative;
+  transition: var(--transition-all);
+}
+
+.agreement-checkbox:checked {
+  background: #B7E7F3;
+  border-color: #B7E7F3;
+}
+
+.agreement-checkbox:checked::after {
+  content: '✓';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: var(--color-white);
+  font-size: 14px;
+  font-weight: bold;
+}
+
+.agreement-checkbox:hover {
+  border-color: #B7E7F3;
+}
+
+.agreement-label {
+  font-family: var(--font-main);
+  font-size: var(--font-size-subcontent);
+  color: var(--color-secondary-gray);
+  cursor: pointer;
+  user-select: none;
+  flex: 1;
+}
+
+.agreement-item.agreement-all .agreement-label {
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
+}
+
+.agreement-label .required {
+  color: #F87171;
+  font-size: 12px;
+}
+
+.agreement-label .optional {
+  color: var(--text-tertiary);
+  font-size: 12px;
+}
+
+.register-links {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: var(--spacing-sm);
+  margin-top: var(--spacing-xl);
+  font-size: var(--font-size-caption);
+  font-family: var(--font-main);
+}
+
+.register-link {
+  color: var(--text-secondary);
+  text-decoration: none;
+  transition: var(--transition-all);
+}
+
+.register-link:hover {
+  color: var(--text-primary);
+}
+
+/* 반응형 디자인 */
+@media (max-width: 480px) {
+  .register-container {
+    padding: var(--spacing-4xl) var(--spacing-3xl);
+  }
+
+  .register-title {
+    font-size: var(--font-size-title);
+  }
+
+  .register-subtitle {
+    font-size: 16px;
+  }
+}
+

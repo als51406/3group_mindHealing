@@ -1,0 +1,306 @@
+/* ========================================
+   토닥톡 (TodakTalk) Design System
+   ======================================== */
+
+/* ========================================
+   1. CSS Variables - Color Palette
+   ======================================== */
+
+:root {
+  /* Primary Colors */
+  --color-background: #FAF7F2;
+  --color-text: #1B2023;
+  --color-background-sub: #DDDDDD;
+  
+  /* Secondary Colors */
+  --color-point: #C1E6F1;
+  --color-point-hover: #A7D8DE;
+  --color-secondary-gray: #66747F;
+  --color-secondary-purple: #D5BCFF;
+  
+  /* Additional UI Colors */
+  --color-white: #FFFFFF;
+  --color-border: #E5E5E5;
+  --color-border-dark: #CCCCCC;
+  --color-hover: #F9F9F9;
+  
+  /* SNS Brand Colors */
+  --color-naver: #03C75A;
+  --color-google: #DB4437;
+  --color-kakao: #FEE500;
+  
+  /* Typography Colors */
+  --text-primary: #000000;
+  --text-secondary: #666666;
+  --text-tertiary: #999999;
+  --text-disabled: #CCCCCC;
+}
+
+/* ========================================
+   2. Typography System
+   ======================================== */
+
+:root {
+  /* Font Families */
+  --font-main: 'Noto Sans KR', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-point: 'Spoqa Han Sans Neo', 'Noto Sans KR', sans-serif;
+  --font-sub: 'IBM Plex Sans KR', 'Noto Sans KR', sans-serif;
+  --font-english: 'Work Sans', 'Roboto', sans-serif;
+  --font-number: 'Roboto Mono', 'Courier New', monospace;
+  
+  /* Font Sizes */
+  --font-size-h1: 40px;
+  --font-size-title: 28px;
+  --font-size-subtitle: 20px;
+  --font-size-content: 16px;
+  --font-size-subcontent: 14px;
+  --font-size-caption: 12px;
+  
+  /* Font Weights */
+  --font-weight-regular: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+  --font-weight-extrabold: 800;
+  
+  /* Line Heights */
+  --line-height-tight: 1.2;
+  --line-height-normal: 1.5;
+  --line-height-relaxed: 1.7;
+}
+
+/* ========================================
+   3. Spacing System
+   ======================================== */
+
+:root {
+  --spacing-xs: 4px;
+  --spacing-sm: 8px;
+  --spacing-md: 12px;
+  --spacing-lg: 16px;
+  --spacing-xl: 20px;
+  --spacing-2xl: 24px;
+  --spacing-3xl: 32px;
+  --spacing-4xl: 40px;
+  --spacing-5xl: 48px;
+}
+
+/* ========================================
+   4. Border Radius
+   ======================================== */
+
+:root {
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-2xl: 20px;
+  --radius-full: 9999px;
+}
+
+/* ========================================
+   5. Shadows
+   ======================================== */
+
+:root {
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 2px 8px rgba(0, 0, 0, 0.08);
+  --shadow-lg: 0 4px 16px rgba(0, 0, 0, 0.1);
+  --shadow-xl: 0 8px 24px rgba(0, 0, 0, 0.12);
+  --shadow-2xl: 0 16px 40px rgba(0, 0, 0, 0.15);
+}
+
+/* ========================================
+   6. Transitions
+   ======================================== */
+
+:root {
+  --transition-fast: 150ms ease;
+  --transition-base: 250ms ease;
+  --transition-slow: 350ms ease;
+  --transition-all: all 0.3s ease;
+}
+
+/* ========================================
+   7. Typography Classes
+   ======================================== */
+
+.text-h1 {
+  font-family: var(--font-main);
+  font-size: var(--font-size-h1);
+  font-weight: var(--font-weight-bold);
+  line-height: var(--line-height-tight);
+  color: var(--text-primary);
+}
+
+.text-title {
+  font-family: var(--font-main);
+  font-size: var(--font-size-title);
+  font-weight: var(--font-weight-bold);
+  line-height: var(--line-height-normal);
+  color: var(--text-primary);
+}
+
+.text-subtitle {
+  font-family: var(--font-main);
+  font-size: var(--font-size-subtitle);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-normal);
+  color: var(--text-primary);
+}
+
+.text-content {
+  font-family: var(--font-main);
+  font-size: var(--font-size-content);
+  font-weight: var(--font-weight-regular);
+  line-height: var(--line-height-relaxed);
+  color: var(--text-primary);
+}
+
+.text-subcontent {
+  font-family: var(--font-main);
+  font-size: var(--font-size-subcontent);
+  font-weight: var(--font-weight-regular);
+  line-height: var(--line-height-normal);
+  color: var(--text-secondary);
+}
+
+.text-caption {
+  font-family: var(--font-main);
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-regular);
+  line-height: var(--line-height-normal);
+  color: var(--text-tertiary);
+}
+
+/* ========================================
+   8. Utility Classes
+   ======================================== */
+
+/* Background Colors */
+.bg-primary { background-color: var(--color-background); }
+.bg-white { background-color: var(--color-white); }
+.bg-sub { background-color: var(--color-background-sub); }
+.bg-point { background-color: var(--color-point); }
+
+/* Text Colors */
+.text-primary { color: var(--text-primary); }
+.text-secondary { color: var(--text-secondary); }
+.text-tertiary { color: var(--text-tertiary); }
+
+/* Border */
+.border { border: 1px solid var(--color-border); }
+.border-dark { border: 1px solid var(--color-border-dark); }
+
+/* Shadows */
+.shadow-sm { box-shadow: var(--shadow-sm); }
+.shadow-md { box-shadow: var(--shadow-md); }
+.shadow-lg { box-shadow: var(--shadow-lg); }
+
+/* Border Radius */
+.rounded-sm { border-radius: var(--radius-sm); }
+.rounded-md { border-radius: var(--radius-md); }
+.rounded-lg { border-radius: var(--radius-lg); }
+.rounded-full { border-radius: var(--radius-full); }
+
+/* Transitions */
+.transition-all { transition: var(--transition-all); }
+.transition-fast { transition: var(--transition-fast); }
+.transition-base { transition: var(--transition-base); }
+
+/* ========================================
+   9. Button Variants
+   ======================================== */
+
+.btn {
+  font-family: var(--font-main);
+  font-size: var(--font-size-content);
+  font-weight: var(--font-weight-medium);
+  padding: var(--spacing-lg) var(--spacing-xl);
+  border-radius: var(--radius-md);
+  transition: var(--transition-all);
+  cursor: pointer;
+  border: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-sm);
+}
+
+.btn-point {
+  background-color: var(--color-point);
+  color: var(--text-primary);
+}
+
+.btn-point:hover {
+  background-color: #A7D8DE;
+}
+
+.btn-outline {
+  background-color: transparent;
+  border: 1px solid var(--color-border);
+  color: var(--text-secondary);
+}
+
+.btn-outline:hover {
+  background-color: var(--color-hover);
+}
+
+/* ========================================
+   10. Card Component
+   ======================================== */
+
+.card {
+  background-color: var(--color-white);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+  padding: var(--spacing-2xl);
+  transition: var(--transition-all);
+}
+
+.card:hover {
+  box-shadow: var(--shadow-lg);
+}
+
+/* ========================================
+   11. Container & Layout
+   ======================================== */
+
+.container {
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 var(--spacing-xl);
+}
+
+.page-wrapper {
+  min-height: 100vh;
+  background-color: var(--color-background);
+}
+
+/* ========================================
+   12. Responsive Breakpoints
+   ======================================== */
+
+:root {
+  --breakpoint-sm: 640px;
+  --breakpoint-md: 768px;
+  --breakpoint-lg: 1024px;
+  --breakpoint-xl: 1280px;
+}
+
+/* ========================================
+   13. Z-Index Scale
+   ======================================== */
+
+:root {
+  --z-base: 1;
+  --z-dropdown: 100;
+  --z-sticky: 200;
+  --z-fixed: 300;
+  --z-modal-backdrop: 400;
+  --z-modal: 500;
+  --z-popover: 600;
+  --z-tooltip: 700;
+}
+
