@@ -161,8 +161,8 @@ const GlassOrb: React.FC = () => (
       clearcoatRoughness={0.1}
       reflectivity={0.5}
       ior={1.0}
-      color="#44444441"
-      attenuationColor="#3535357b"
+      color="#444444"
+      attenuationColor="#353535"
       attenuationDistance={1.0}
       transparent
       opacity={0.005}

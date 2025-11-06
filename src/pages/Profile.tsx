@@ -9,7 +9,7 @@ const Profile: React.FC = () => {
   
   const [profile, setProfile] = useState<UserProfile>({
     id: user?.id || '',
-    nickname: user?.nickname || user?.email?.split('@')[0] || 'User',
+    nickname: user?.nickname || 'User',
     title: '',  // 칭호는 localStorage에서 가져옴
     profileImage: user?.profileImage || '',
     todayEmotion: undefined,
@@ -31,9 +31,13 @@ const Profile: React.FC = () => {
         if (res.ok) {
           const data = await res.json();
           if (data.user) {
+            console.log('👤 사용자 정보:', data.user);
             setBio(data.user.bio || '');
             setProfile(prev => ({
               ...prev,
+              id: data.user._id || data.user.id,
+              nickname: data.user.nickname || 'User',
+              profileImage: data.user.profileImage || '',
               bio: data.user.bio || '',
             }));
           }

@@ -35,7 +35,7 @@
   width: 100%;
   max-width: 360px;
   height: auto;
-  min-height: 200px;
+  min-height: 180px;
 }
 
 /* 반응형: 작은 화면 */
@@ -166,7 +166,7 @@
 }
 
 .profile-card.compact .profile-section-bottom {
-  padding: 6px 20px 18px 20px;
+  padding: 6px 10px 18px 10px;
   gap: 16px;
 }
 
@@ -213,8 +213,8 @@
 }
 
 .profile-card.compact .profile-avatar-placeholder {
-  width: 90px;
-  height: 90px;
+  width: 70px;
+  height: 70px;
   font-size: 36px;
   border-width: 3px;
 }

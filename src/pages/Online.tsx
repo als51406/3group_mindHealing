@@ -13,8 +13,8 @@ import './Online.css';
 
 export default function Online() {
 
-  // 서버 주소: 개발 환경에서는 localhost, 프로덕션에서는 환경변수 사용
-  const serverLink = import.meta.env.VITE_SOCKET_SERVER_URL || "http://192.168.4.8:7780";
+  // 서버 주소: Vite 프록시를 통해 자동으로 연결 (개발: localhost, 프로덕션: 환경변수)
+  const serverLink = import.meta.env.VITE_SOCKET_SERVER_URL || "";
 
   // navigate: 페이지를 이동할 때 사용
   const navigate = useNavigate();
@@ -95,6 +95,7 @@ export default function Online() {
         const res = await fetch('/api/me', { credentials: 'include' });
         if (res.ok) {
           const data = await res.json();
+          console.log('👤 내 프로필 정보:', data.user);
           if (data.user) {
             // 전체 감정 분석의 주 감정 색상 로드
             const titleRes = await fetch('/api/user/emotion-title', {
@@ -140,11 +141,17 @@ export default function Online() {
             
             setMyProfile({
               id: data.user._id || data.user.id,
-              nickname: data.user.nickname,
+              nickname: data.user.nickname || 'User',
               title: title,
               profileImage: data.user.profileImage || '',
               todayEmotion: emotionData || undefined,
               topEmotions: topEmotions,
+            });
+            
+            console.log('✅ 내 프로필 로드 완료:', {
+              nickname: data.user.nickname,
+              title: title,
+              topEmotionsCount: topEmotions.length
             });
           }
         }
@@ -171,6 +178,12 @@ export default function Online() {
   // startMatching: 대화 상대 찾는 중...
   function startMatching() {
 
+    console.log('🔍 매칭 시작:', {
+      socketConnected: socket.current?.connected,
+      socketId: socket.current?.id,
+      user: user?.email
+    });
+
     // <2> 챗온 매칭 중 페이지 활성화
     setDisplayMatching(true);
 
@@ -181,7 +194,13 @@ export default function Online() {
     setMatchingMessage("당신의 마음을 읽어줄 사람을 찾는중...");
 
     // 클라이언트 -> 서버 (startMatching)
-    socket.current?.emit("startMatching");
+    if (socket.current?.connected) {
+      console.log('✅ startMatching 이벤트 전송');
+      socket.current.emit("startMatching");
+    } else {
+      console.error('❌ Socket이 연결되지 않음');
+      showToast({ message: '서버 연결 실패. 페이지를 새로고침해주세요.', type: 'error' });
+    }
   }
 
   // --------------------------------------- 채팅 페이지 ---------------------------------------
@@ -323,6 +342,9 @@ export default function Online() {
 
   // -------------------------------------- 서버 상호작용 -시작- --------------------------------------
   useEffect(() => {
+    // user가 로드되지 않았으면 연결하지 않음
+    if (!user) return;
+    
     // 서버 주소에 맞게 포트 확인 (백엔드에서 httpServer.listen(PORT)와 동일해야 함)
     // Chrome Private Network Access 경고: localhost HTTP 연결 시 발생하는 경고입니다.
     // 개발 환경에서는 정상 동작하며, 프로덕션에서는 HTTPS 사용을 권장합니다.
@@ -330,38 +352,83 @@ export default function Online() {
       transports: ['websocket', 'polling'], // WebSocket 우선 사용
       upgrade: true, // polling에서 websocket으로 업그레이드
       rememberUpgrade: true, // 업그레이드 기억
+      reconnection: true, // 자동 재연결 활성화
+      reconnectionAttempts: 5, // 최대 재연결 시도 횟수
+      reconnectionDelay: 1000, // 재연결 지연 시간 (ms)
+      timeout: 10000, // 연결 타임아웃 (ms)
+      auth: {
+        email: user.email || ''
+      }
     });
     
     socket.current = client;
 
     // 서버 -> 클라이언트 (connect)
     client.on("connect", () => {
-      console.log(`서버에 연결되었습니다: ${client.id}`);
+      console.log(`✅ 서버에 연결되었습니다: ${client.id}`);
+    });
+    
+    // 연결 오류 처리
+    client.on("connect_error", (error) => {
+      console.error("❌ 서버 연결 실패:", error.message);
+    });
+    
+    // 재연결 시도
+    client.on("reconnect_attempt", (attempt) => {
+      console.log(`서버 재연결 시도 중... (${attempt}회)`);
+    });
+    
+    // 재연결 실패
+    client.on("reconnect_failed", () => {
+      console.error("서버 재연결 실패. 페이지를 새로고침해주세요.");
+      showToast({ message: '서버 연결에 실패했습니다. 페이지를 새로고침해주세요.', type: 'error' });
+    });
+    
+    // 연결 해제
+    client.on("disconnect", (reason) => {
+      console.log("서버 연결 해제:", reason);
+      if (reason === "io server disconnect") {
+        // 서버가 연결을 끊은 경우 수동으로 재연결
+        client.connect();
+      }
     });
 
     // 서버 -> 클라이언트 (matched)
     client.on("matched", async (data) => {
+
+      console.log('🎉 매칭 성공:', data);
 
       // 서버에서 받은 방 ID 저장
       setRoomId(data.roomId);
       
       // 상대방의 전체 프로필 정보 로드
       try {
-        // 상대방의 감정 통계 가져오기 (API 필요 시)
+        // 서버에서 받은 기본 프로필 정보
         const partnerEmotionStats = data.partnerEmotionStats || [];
         
+        // 상대방의 상세 프로필 설정
         setPartnerProfile({
           id: data.partnerId || 'partner',
           nickname: data.partnerNickname || '상대방',
-          title: data.partnerTitle || '당신의 파트너',
+          title: data.partnerTitle || '마음을 나누는 사람',
           profileImage: data.partnerProfileImage || '',
-          todayEmotion: data.partnerEmotion || undefined,
+          todayEmotion: data.partnerEmotion ? {
+            emotion: data.partnerEmotion,
+            color: data.partnerEmotionColor || '#a78bfa',
+            score: 0
+          } : undefined,
           topEmotions: partnerEmotionStats.slice(0, 3).map((stat: any, index: number) => ({
             rank: index + 1,
             emotion: stat.emotion || stat._id,
             count: stat.count,
-            color: stat.color
+            color: stat.color || '#a78bfa'
           })),
+        });
+        
+        console.log('상대방 프로필 로드 완료:', {
+          nickname: data.partnerNickname,
+          title: data.partnerTitle,
+          topEmotionsCount: partnerEmotionStats.length
         });
       } catch (error) {
         console.error('상대방 프로필 로드 실패:', error);
@@ -371,7 +438,7 @@ export default function Online() {
           nickname: data.partnerNickname || '상대방',
           title: '당신의 파트너',
           profileImage: '',
-          todayEmotion: data.partnerEmotion || undefined,
+          todayEmotion: undefined,
           topEmotions: [],
         });
       }
@@ -448,7 +515,7 @@ export default function Online() {
       client.disconnect();
 
     }
-  }, []);
+  }, [user, serverLink, showToast]);
 
   // -------------------------------------- 서버 상호작용 -끝- --------------------------------------
 
