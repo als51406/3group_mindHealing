@@ -358,6 +358,41 @@ export default function Online() {
     }
   };
 
+  // exitChat: 채팅방 나가기
+  const exitChat = async () => {
+    if (!confirm('채팅방을 나가시겠습니까?')) {
+      return;
+    }
+
+    // 메시지가 있으면 다이어리 저장 여부 묻기
+    if (messagesRef.current && messagesRef.current.length > 0) {
+      const shouldSave = confirm('대화 내용을 다이어리에 저장하시겠습니까?');
+      if (shouldSave) {
+        await saveToDiary();
+      }
+    }
+
+    // 상태 초기화
+    setMessages([]);
+    messagesRef.current = [];
+    setInput('');
+    setPartnerProfile(null);
+    saved.current = false;
+
+    // 소켓에 매칭 취소 알림
+    if (socket.current) {
+      socket.current.emit('cancelMatch');
+    }
+
+    // UI 상태 초기화 (메인 페이지로 돌아가기)
+    setDisplayChat(false);
+    setDisplayMatched(false);
+    setDisplayMatching(false);
+    setDisplayMain(true);
+
+    showToast({ message: '채팅방에서 나갔습니다.', type: 'info' });
+  };
+
   // 채팅이 추가될 때 마다 맨 아래로 자동 스크롤
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -754,6 +789,10 @@ export default function Online() {
               width: '100%',
               maxWidth: '300px',
               minWidth: '250px',
+              height: 'calc(100vh - 200px)',
+              minHeight: '400px',
+              display: 'flex',
+              flexDirection: 'column',
             }}>
               {partnerProfile && (
                 <>
@@ -771,8 +810,38 @@ export default function Online() {
               display: 'flex',
               flexDirection: 'column',
             }}>
-              {/* 채팅 제목 */}
-              <h2 style={{ textAlign: 'center', margin: '0 0 16px 0' }}>온라인 채팅</h2>
+              {/* 채팅 제목과 나가기 버튼 */}
+              <div style={{ position: 'relative', marginBottom: 16 }}>
+                <h2 style={{ textAlign: 'center', margin: 0 }}>온라인 채팅</h2>
+                <button
+                  onClick={exitChat}
+                  style={{
+                    position: 'absolute',
+                    right: 0,
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    padding: '6px 12px',
+                    backgroundColor: '#EF4444',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: 6,
+                    cursor: 'pointer',
+                    fontSize: 14,
+                  }}
+                >
+                  나가기
+                </button>
+              </div>
+
+              {/* 안내 문구 */}
+              <div style={{ 
+                fontSize: 12, 
+                color: '#6B7280', 
+                marginBottom: 12,
+                textAlign: 'center'
+              }}>
+                💡 채팅창에서 나가면 대화 내역이 사라집니다. 나가기 전 다이어리에 저장할 수 있습니다.
+              </div>
 
               {/* 채팅창 */}
               <div
@@ -885,6 +954,10 @@ export default function Online() {
           width: '100%',
           maxWidth: '300px',
           minWidth: '250px',
+          height: 'calc(100vh - 200px)',
+          minHeight: '400px',
+          display: 'flex',
+          flexDirection: 'column',
         }}>
           {myProfile && (
             <>
