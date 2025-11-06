@@ -27,6 +27,7 @@ export interface DiarySessionResponse {
   originalMessageCount?: number; // 온라인 채팅의 원본 메시지 개수
   summary?: string; // 대화 요약
   memo?: string; // 메모
+  partnerNickname?: string; // 온라인 채팅 상대방 닉네임
   lastUpdatedAt: string;
   preview?: string;
 }

@@ -127,6 +127,7 @@ export default function Diary() {
     const [summary, setSummary] = useState<string>(''); // 대화 요약
     const [isSummarizing, setIsSummarizing] = useState<boolean>(false); // 요약 중 상태
     const [memo, setMemo] = useState<string>(''); // 온라인 채팅 메모
+    const [partnerNickname, setPartnerNickname] = useState<string>(''); // 온라인 채팅 상대방 닉네임
     const hasSummarizedSessionRef = useRef<string | null>(null); // 이미 요약 실행한 세션 ID (중복 방지)
     const bottomRef = useRef<HTMLDivElement | null>(null);
     const textareaRef = useRef<HTMLTextAreaElement | null>(null); // textarea 참조
@@ -346,19 +347,23 @@ export default function Diary() {
             if (sessionType === 'online') {
                 const loadedSummary = data?.session?.summary || '';
                 const loadedMemo = data?.session?.memo || '';
+                const loadedPartnerNickname = data?.session?.partnerNickname || '';
 
                 if (import.meta.env.DEV) {
                     console.log('📄 Loading summary and memo:', {
                         summary: loadedSummary ? loadedSummary.substring(0, 50) + '...' : '(empty)',
-                        memo: loadedMemo ? loadedMemo.substring(0, 30) + '...' : '(empty)'
+                        memo: loadedMemo ? loadedMemo.substring(0, 30) + '...' : '(empty)',
+                        partnerNickname: loadedPartnerNickname
                     });
                 }
 
                 setSummary(loadedSummary);
                 setMemo(loadedMemo);
+                setPartnerNickname(loadedPartnerNickname);
             } else {
                 setSummary('');
                 setMemo('');
+                setPartnerNickname('');
             }
 
             // DEV 환경 디버깅
@@ -1029,10 +1034,13 @@ export default function Diary() {
 
     const Bubble = (m: DiaryMessage, i: number) => {
         const mine = m.role === 'user';
+        // 상대방 닉네임의 첫 글자 (없으면 'AI')
+        const partnerInitial = partnerNickname ? partnerNickname.charAt(0).toUpperCase() : 'AI';
+        
         return (
             <div key={m.id || i} style={{ display: 'flex', justifyContent: mine ? 'flex-end' : 'flex-start', marginBottom: 8 }}>
                 {!mine && (
-                    <div aria-hidden style={{ width: 26, height: 26, borderRadius: 13, background: '#eee', color: '#333', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, marginRight: 8 }}>AI</div>
+                    <div aria-hidden style={{ width: 26, height: 26, borderRadius: 13, background: '#eee', color: '#333', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, marginRight: 8 }}>{partnerInitial}</div>
                 )}
                 <div style={{ position: 'relative', maxWidth: '70%', whiteSpace: 'pre-wrap', wordBreak: 'break-word', background: mine ? '#2563eb' : '#f1f5f9', color: mine ? '#fff' : '#111', padding: '8px 12px', borderRadius: 12, borderTopRightRadius: mine ? 2 : 12, borderTopLeftRadius: mine ? 12 : 2 }}>
                     {m.content}
