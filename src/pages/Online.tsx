@@ -7,6 +7,8 @@ import { io, Socket } from "socket.io-client";
 import { useAuth } from '../hooks/useAuth';
 import { useToast } from '../components/Toast';
 import Orb from '../components/Orb';
+import ProfileCard from '../components/ProfileCard';
+import type { UserProfile } from '../types/api';
 import './Online.css';
 
 export default function Online() {
@@ -53,6 +55,13 @@ export default function Online() {
   // bottomRef: 자동 스크롤용 더미
   const bottomRef = useRef<HTMLDivElement | null>(null);
 
+  // -------------------------------------- 프로필 상태 --------------------------------------
+  // myProfile: 내 프로필 정보
+  const [myProfile, setMyProfile] = useState<UserProfile | null>(null);
+  
+  // partnerProfile: 상대방 프로필 정보
+  const [partnerProfile, setPartnerProfile] = useState<UserProfile | null>(null);
+
   // -------------------------------------- 서버 연동 상태 --------------------------------------
   // socket: 현재 연결된 Socket 객체
   const socket = useRef<Socket | null>(null);
@@ -75,6 +84,77 @@ export default function Online() {
     // 로그인 안되있으면 로그인 페이지로 이동
     if (!user) navigate("/login");
   }, [loading, user, navigate])
+
+  // 내 프로필 로드
+  useEffect(() => {
+    const loadMyProfile = async () => {
+      if (!user) return;
+      
+      try {
+        // 기본 프로필 정보
+        const res = await fetch('/api/me', { credentials: 'include' });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.user) {
+            // 전체 감정 분석의 주 감정 색상 로드
+            const titleRes = await fetch('/api/user/emotion-title', {
+              credentials: 'include'
+            });
+            
+            let emotionData = null;
+            if (titleRes.ok) {
+              const titleData = await titleRes.json();
+              if (titleData.emotion && titleData.color) {
+                emotionData = {
+                  emotion: titleData.emotion,
+                  color: titleData.color,
+                  score: 0
+                };
+              }
+            }
+            
+            // 감정 TOP3 로드
+            const statsRes = await fetch('/api/user/emotion-stats', {
+              credentials: 'include'
+            });
+            
+            let topEmotions = [];
+            if (statsRes.ok) {
+              const statsData = await statsRes.json();
+              if (statsData.ok && statsData.topEmotions) {
+                topEmotions = statsData.topEmotions.slice(0, 3);
+              }
+            }
+            
+            // 칭호 로드
+            const cached = localStorage.getItem('emotion_title_cache');
+            let title = '';
+            if (cached) {
+              try {
+                const { title: cachedTitle } = JSON.parse(cached);
+                title = cachedTitle;
+              } catch (e) {
+                // ignore
+              }
+            }
+            
+            setMyProfile({
+              id: data.user._id || data.user.id,
+              nickname: data.user.nickname,
+              title: title,
+              profileImage: data.user.profileImage || '',
+              todayEmotion: emotionData || undefined,
+              topEmotions: topEmotions,
+            });
+          }
+        }
+      } catch (error) {
+        console.error('내 프로필 로드 실패:', error);
+      }
+    };
+    
+    loadMyProfile();
+  }, [user]);
 
   // 컴포넌트가 언마운트될 때(페이지를 벗어날 때) 실행
   useEffect(() => {
@@ -264,6 +344,16 @@ export default function Online() {
 
       // 서버에서 받은 방 ID 저장
       setRoomId(data.roomId);
+      
+      // 상대방 프로필 설정 (임시로 기본 프로필 사용)
+      setPartnerProfile({
+        id: 'partner',
+        nickname: data.partnerNickname || '상대방',
+        title: '당신의 파트너',
+        profileImage: '',
+        todayEmotion: data.partnerEmotion || undefined,
+        topEmotions: [],
+      });
 
       // <2> 챗온 채팅 중 안내 메시지 변경
       setMatchingMessage("찾았습니다!!");
@@ -472,20 +562,49 @@ export default function Online() {
             </p>
 
             {/* 프로필 카드들 */}
-            <div style={{ display: 'flex', flexDirection: 'row', justifyContent: 'center', gap: 20 }}>
+            <div style={{
+              display: 'flex', 
+              flexDirection: 'row', 
+              justifyContent: 'center', 
+              alignItems: 'flex-start', 
+              gap: 20, 
+              maxWidth: '100%',
+              width: '100%',
+              padding: '0 16px'
+            }}>
               {/* 상대방 프로필 */}
-              <div className="profile_card">
-                <div style={{ fontSize: 48, marginBottom: 12 }}>😊</div>
-                <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 8, color: '#374151' }}>상대방</div>
-                <div style={{ fontSize: 14, color: '#6b7280' }}>당신의 파트너</div>
-              </div>
+              {partnerProfile && (
+                <div style={{ 
+                  display: 'flex', 
+                  flexDirection: 'column', 
+                  alignItems: 'center',
+                  flex: '1 1 0',
+                  minWidth: 0,
+                  maxWidth: '400px'
+                }}>
+                  <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 12, color: '#374151' }}>상대방</div>
+                  <div style={{ width: '100%', display: 'flex', justifyContent: 'center' }}>
+                    <ProfileCard profile={partnerProfile} compact />
+                  </div>
+                </div>
+              )}
 
               {/* 내 프로필 */}
-              <div className="profile_card">
-                <div style={{ fontSize: 48, marginBottom: 12 }}>👤</div>
-                <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 8, color: '#374151' }}>나</div>
-                <div style={{ fontSize: 14, color: '#6b7280' }}>당신</div>
-              </div>
+              {myProfile && (
+                <div style={{ 
+                  display: 'flex', 
+                  flexDirection: 'column', 
+                  alignItems: 'center',
+                  flex: '1 1 0',
+                  minWidth: 0,
+                  maxWidth: '400px'
+                }}>
+                  <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 12, color: '#374151' }}>나</div>
+                  <div style={{ width: '100%', display: 'flex', justifyContent: 'center' }}>
+                    <ProfileCard profile={myProfile} compact />
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
