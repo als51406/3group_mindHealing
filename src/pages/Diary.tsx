@@ -1600,7 +1600,34 @@ export default function Diary() {
                                         </div>
                                     </div>
 
-                                    {/* 감정 진단 섹션: 오른쪽 */}
+                                    
+
+                                {/* 매칭 제안 대화창 */}
+                                {showMatchingSuggestion && (
+                                    <div className="matching-suggestion-bubble">
+                                        <div className="matching-suggestion-content">
+                                            <p>감정 진단이 완료되었습니다! 다른 사용자와 매칭하여 대화를 해보시겠어요?</p>
+                                            <div className="matching-suggestion-buttons">
+                                                <button 
+                                                    className="matching-btn match"
+                                                    onClick={() => {
+                                                        setShowMatchingSuggestion(false);
+                                                        navigate('/online');
+                                                    }}
+                                                >
+                                                    매칭하기
+                                                </button>
+                                                <button 
+                                                    className="matching-btn later"
+                                                    onClick={() => setShowMatchingSuggestion(false)}
+                                                >
+                                                    잠깐만요
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+                                {/* 감정 진단 섹션: 오른쪽 */}
                                     <div style={{
                                         background: 'transparent',
                                         borderRadius: 16,
@@ -1609,7 +1636,7 @@ export default function Diary() {
                                         backgroundImage: 'linear-gradient(white, white), linear-gradient(135deg, #667eea 0%, #764ba2 25%, #f093fb 50%, #4facfe 75%, #667eea 100%)',
                                         backgroundOrigin: 'border-box',
                                         backgroundClip: 'padding-box, border-box',
-                                        
+                                        minWidth:"340px",
                                         marginTop: 55,
                                         transition: 'all 0.3s ease',
                                         display: 'flex',
@@ -1743,32 +1770,6 @@ export default function Diary() {
                                         </button>
                                     )}
                                 </div>
-
-                                {/* 매칭 제안 대화창 */}
-                                {showMatchingSuggestion && (
-                                    <div className="matching-suggestion-bubble">
-                                        <div className="matching-suggestion-content">
-                                            <p>감정 진단이 완료되었습니다! 다른 사용자와 매칭하여 대화를 해보시겠어요?</p>
-                                            <div className="matching-suggestion-buttons">
-                                                <button 
-                                                    className="matching-btn match"
-                                                    onClick={() => {
-                                                        setShowMatchingSuggestion(false);
-                                                        navigate('/online');
-                                                    }}
-                                                >
-                                                    매칭하기
-                                                </button>
-                                                <button 
-                                                    className="matching-btn later"
-                                                    onClick={() => setShowMatchingSuggestion(false)}
-                                                >
-                                                    잠깐만요
-                                                </button>
-                                            </div>
-                                        </div>
-                                    </div>
-                                )}
                             </div>
 
                                 <div style={{ display: 'flex', flexDirection: 'row', justifyContent: 'center', gap: '1vw' }}>
