@@ -118,6 +118,7 @@ export default function Diary() {
 
     const [isAnalyzing, setIsAnalyzing] = useState(false); // 수동 분석 중
     const [showCompletedAnimation, setShowCompletedAnimation] = useState(false); // 진단 완료 애니메이션
+    const [showMatchingSuggestion, setShowMatchingSuggestion] = useState(false); // 매칭 제안 대화창
     const [input, setInput] = useState('');
     const [sending, setSending] = useState(false);
     const [loadingDiary, setLoadingDiary] = useState(false);
@@ -723,6 +724,8 @@ export default function Diary() {
                 body: JSON.stringify({ text }),
             });
             if (!res.ok) {
+                const errorText = await res.text();
+                console.error('Chat API Error:', res.status, errorText);
                 if (isOnlineTab) {
                     setAiChatMessages((prev) => [...prev.slice(0, -1), { role: 'assistant', content: '답변 생성에 실패했습니다.' }]);
                 } else {
@@ -814,6 +817,9 @@ export default function Diary() {
                 setTimeout(() => {
                     setShowCompletedAnimation(false);
                 }, 2000); // 2초 후 자동 숨김
+
+                // 매칭 제안 대화창 표시
+                setShowMatchingSuggestion(true);
             }
 
             await refreshList();
@@ -1737,12 +1743,38 @@ export default function Diary() {
                                         </button>
                                     )}
                                 </div>
+
+                                {/* 매칭 제안 대화창 */}
+                                {showMatchingSuggestion && (
+                                    <div className="matching-suggestion-bubble">
+                                        <div className="matching-suggestion-content">
+                                            <p>감정 진단이 완료되었습니다! 다른 사용자와 매칭하여 대화를 해보시겠어요?</p>
+                                            <div className="matching-suggestion-buttons">
+                                                <button 
+                                                    className="matching-btn match"
+                                                    onClick={() => {
+                                                        setShowMatchingSuggestion(false);
+                                                        navigate('/online');
+                                                    }}
+                                                >
+                                                    매칭하기
+                                                </button>
+                                                <button 
+                                                    className="matching-btn later"
+                                                    onClick={() => setShowMatchingSuggestion(false)}
+                                                >
+                                                    잠깐만요
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
 
                                 <div style={{ display: 'flex', flexDirection: 'row', justifyContent: 'center', gap: '1vw' }}>
 
                                     {/* 채팅 영역 */}
-                                    <div className="diary_chat_area">
+                                    <div className="diary_chat_area" style={{ position: 'relative' }}>
 
                                         {/* 채팅 로그 */}
                                         <div className="diary_chat_log" style={{ border: '1px solid #e5e7eb', borderRadius: 12, height: '55vh', maxHeight: '55vh', padding: 12, overflowY: 'auto', background: 'rgba(255,255,255,0.75)', margin: '15vh 0 0', boxSizing: 'border-box', position: 'relative' }}>

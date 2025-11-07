@@ -26,7 +26,7 @@ const PORT = Number(process.env.PORT || 7780);
 const JWT_SECRET = process.env.JWT_SECRET || 'dev_secret';
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || '';
 // 기본 모델
-const OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-5-nano';
+const OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-4o-mini';
 
 // emotion_colors.json을 먼저 로드 (chatCompletionWithFallback에서 사용)
 function loadUserEmotionColorsEarly(): Record<string, string> {
@@ -96,9 +96,9 @@ async function chatCompletionWithFallback(openai: OpenAI, messages: Array<{ role
     const msg = e?.message || '';
     const status = e?.status || e?.code;
     const notFound = /model\s?.*does not exist|unknown model|not found/i.test(msg) || status === 404;
-    if (notFound && preferred !== 'gpt-5-nano') {
-      // 모델 미존재 시 gpt-5-nano로 폴백
-  return await openai.chat.completions.create({ model: 'gpt-5-nano', messages: [
+    if (notFound && preferred !== 'gpt-3.5-turbo') {
+      // 모델 미존재 시 gpt-3.5-turbo로 폴백
+  return await openai.chat.completions.create({ model: 'gpt-3.5-turbo', messages: [
         ...messages.map((m: any) => ({ role: m.role, content: String(m.content) })),
         {
           role: 'system',
