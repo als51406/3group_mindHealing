@@ -1539,73 +1539,78 @@ export default function Diary() {
                 </aside>
 
                 {/* 우측: 대화 + 배경색 */}
-                <main className="diary-main" style={{ padding: 16, boxSizing: 'border-box', display: 'flex', flexDirection: 'column', gap: 12 }}>
+                <main className="diary-main" style={{ padding: 16, boxSizing: 'border-box', display: 'flex', flexDirection: 'column',position:"relative", gap: 12 }}>
                     {activeTab === 'ai' ? (
                         <>
                             {/* AI 대화 탭 - 기존 UI 유지 */}
                             <div style={{ ...bgStyle, border: '1px solid #e5e7eb', borderRadius: 12, minHeight: '70vh', padding: 12, position: 'relative', boxSizing: 'border-box', flex: 1 }}>
-                                {/* 감정 오브: 채팅창 왼쪽 상단 고정, 크게 */}
-                                <div style={{
-                                    position: 'absolute',
-                                    top: -25,
-                                    left: 200,
-                                    zIndex: 20,
-                                    pointerEvents: 'none',
-                                    width: 200,
-                                    height: 200,
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center'
-                                }}>
-                                    <div className="aurora-breathe" style={{
-                                        width: 200,
-                                        height: 200,
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        transformOrigin: 'center center',
-                                        filter: 'drop-shadow(0 0 8px rgba(0, 0, 0, 0.3)) drop-shadow(0 2px 16px rgba(0, 0, 0, 0.2))'
-                                    }}>
-                                        <WebGLErrorBoundary>
-                                            <SiriOrb
-                                                color={emotionOrbColor}
-                                                size={200}
-                                                intensity={0.85}
-                                                analyzing={isWaitingAnalysis}
-                                                showCompleted={showCompletedAnimation}
-                                                messageCount={messageCount}
-                                            />
-                                        </WebGLErrorBoundary>
-                                    </div>
-                                </div>
-
                                 {/* 날짜 표시 (우측 상단) */}
                                 <div style={{ position: 'absolute', top: 12, right: 12, fontSize: 18, fontWeight: 700, color: '#1f2937', textShadow: '0 1px 3px rgba(255,255,255,0.8)' }}>
                                     {selectedDate}
                                 </div>
 
-                                {/* 감정 진단 섹션 (중앙 상단, 가로 배치) */}
+                                {/* 오브 + 감정 진단 섹션 컨테이너 */}
                                 <div style={{
                                     position: 'absolute',
-                                    top: 30,
-                                    left: '68.8%',
+                                    top: -25,
+                                    left: '48%',
                                     transform: 'translateX(-50%)',
-                                    background: 'transparent',
-                                    borderRadius: 16,
-                                    padding: '14px 24px',
-                                    border: '2px solid transparent',
-                                    backgroundImage: 'linear-gradient(white, white), linear-gradient(135deg, #667eea 0%, #764ba2 25%, #f093fb 50%, #4facfe 75%, #667eea 100%)',
-                                    backgroundOrigin: 'border-box',
-                                    backgroundClip: 'padding-box, border-box',
-                                    minWidth: 500,
-                                    maxWidth: '85%',
-                                    zIndex: 15,
-                                    transition: 'all 0.3s ease',
+                                    width: '62vw',
                                     display: 'flex',
-                                    alignItems: 'center',
+                                    alignItems: 'flex-start',
                                     justifyContent: 'space-between',
-                                    gap: 20
+                                    gap: 20,
+                                    zIndex: 20
                                 }}>
+                                    {/* 감정 오브: 왼쪽 */}
+                                    <div style={{
+                                        pointerEvents: 'none',
+                                        width: 200,
+                                        height: 200,
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        flexShrink: 0
+                                    }}>
+                                        <div className="aurora-breathe" style={{
+                                            width: 200,
+                                            height: 200,
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            transformOrigin: 'center center',
+                                            filter: 'drop-shadow(0 0 8px rgba(0, 0, 0, 0.3)) drop-shadow(0 2px 16px rgba(0, 0, 0, 0.2))'
+                                        }}>
+                                            <WebGLErrorBoundary>
+                                                <SiriOrb
+                                                    color={emotionOrbColor}
+                                                    size={200}
+                                                    intensity={0.85}
+                                                    analyzing={isWaitingAnalysis}
+                                                    showCompleted={showCompletedAnimation}
+                                                    messageCount={messageCount}
+                                                />
+                                            </WebGLErrorBoundary>
+                                        </div>
+                                    </div>
+
+                                    {/* 감정 진단 섹션: 오른쪽 */}
+                                    <div style={{
+                                        background: 'transparent',
+                                        borderRadius: 16,
+                                        padding: '14px 24px',
+                                        border: '2px solid transparent',
+                                        backgroundImage: 'linear-gradient(white, white), linear-gradient(135deg, #667eea 0%, #764ba2 25%, #f093fb 50%, #4facfe 75%, #667eea 100%)',
+                                        backgroundOrigin: 'border-box',
+                                        backgroundClip: 'padding-box, border-box',
+                                        
+                                        marginTop: 55,
+                                        transition: 'all 0.3s ease',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'space-between',
+                                        gap: 20
+                                    }}>
                                     {/* 좌측: 아이콘 + 상태 정보 */}
                                     <div style={{
                                         display: 'flex',
@@ -1732,6 +1737,7 @@ export default function Diary() {
                                         </button>
                                     )}
                                 </div>
+                            </div>
 
                                 <div style={{ display: 'flex', flexDirection: 'row', justifyContent: 'center', gap: '1vw' }}>
 
