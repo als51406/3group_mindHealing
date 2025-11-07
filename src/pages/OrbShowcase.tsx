@@ -1,13 +1,7 @@
 // OrbShowcase.tsx - 3D 구체 비교 및 테스트 페이지
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import EmotionOrb from '../components/EmotionOrb';
-import EmotionOrbv1 from '../components/EmotionOrbv1';
 import EmotionOrbPremium from '../components/EmotionOrbPremium';
-import EmotionOrbv2 from '../components/EmotionOrbv2';
-import EmotionOrbv3 from '../components/EmotionOrbv3';
-import EmotionOrbv4 from '../components/EmotionOrbv4';
-import EmotionOrbv5 from '../components/EmotionOrbv5';
 import SiriOrb from '../components/SiriOrb';
 import Orb from '../components/Orb';
 
@@ -34,7 +28,7 @@ const customColors = [
 export default function OrbShowcase() {
   const navigate = useNavigate();
   const [selectedColor, setSelectedColor] = useState('#FFD54F');
-  const [selectedOrb, setSelectedOrb] = useState<'basic' | 'v1' | 'premium' | 'v2' | 'v3' | 'v4' | 'v5' | 'siri' | 'orb'>('v5');
+  const [selectedOrb, setSelectedOrb] = useState<'premium' | 'siri' | 'orb'>('premium');
   const [customColor, setCustomColor] = useState('#FFD54F');
   const [orbSize, setOrbSize] = useState(280);
   const [intensity, setIntensity] = useState(1);
@@ -117,13 +111,7 @@ export default function OrbShowcase() {
             marginBottom: 50,
           }}>
             {[
-              { key: 'basic' as const, label: 'EmotionOrb', desc: '부드러운 파스텔' },
-              { key: 'v1' as const, label: 'EmotionOrbv1', desc: '오로라 효과' },
               { key: 'premium' as const, label: 'Premium', desc: '역동적 오로라' },
-              { key: 'v2' as const, label: 'V2', desc: '스크린샷 스타일' },
-              { key: 'v3' as const, label: 'V3', desc: '오로라 유리 + Bloom' },
-              { key: 'v4' as const, label: 'V4 Premium', desc: 'All Features' },
-              { key: 'v5' as const, label: 'V5 GSAP', desc: 'Shader + Transmission + HDRI + Post', highlight: true },
               { key: 'siri' as const, label: 'Siri Orb', desc: '애플 스타일 실크 리본', highlight: true },
               { key: 'orb' as const, label: 'Orb', desc: 'Siri 스타일 실크 리본', highlight: true },
             ].map(({ key, label, desc, highlight }) => (
@@ -203,26 +191,8 @@ export default function OrbShowcase() {
               maxWidth: '1000px',
               boxShadow: 'inset 0 2px 15px rgba(102, 126, 234, 0.1)',
             }}>
-              {selectedOrb === 'basic' && (
-                <EmotionOrb color={selectedColor} size={orbSize} intensity={intensity} />
-              )}
-              {selectedOrb === 'v1' && (
-                <EmotionOrbv1 color={selectedColor} size={orbSize} intensity={intensity} />
-              )}
               {selectedOrb === 'premium' && (
                 <EmotionOrbPremium color={selectedColor} size={orbSize} intensity={intensity} />
-              )}
-              {selectedOrb === 'v2' && (
-                <EmotionOrbv2 color={selectedColor} size={orbSize} intensity={intensity} />
-              )}
-              {selectedOrb === 'v3' && (
-                <EmotionOrbv3 color={selectedColor} size={orbSize} intensity={intensity} />
-              )}
-              {selectedOrb === 'v4' && (
-                <EmotionOrbv4 color={selectedColor} size={orbSize} intensity={intensity} />
-              )}
-              {selectedOrb === 'v5' && (
-                <EmotionOrbv5 color={selectedColor} size={orbSize} intensity={intensity} />
               )}
               {selectedOrb === 'siri' && (
                 <div style={{ width: '100%', height: '100%' }}>
