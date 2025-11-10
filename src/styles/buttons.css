@@ -1,0 +1,609 @@
+/* ========================================
+   토닥톡 (TodakTalk) Button Design System
+   ======================================== */
+
+/* ========================================
+   1. Primary Buttons - 주요 액션
+   ======================================== */
+
+.btn-primary {
+  /* Base Styles */
+  padding: 16px 32px;
+  border-radius: var(--radius-xl);
+  border: none;
+  
+  /* Typography */
+  font-family: var(--font-main);
+  font-size: var(--font-size-content);
+  font-weight: var(--font-weight-semibold);
+  
+  /* Colors */
+  background: linear-gradient(135deg, var(--color-point) 0%, #B5D9E8 100%);
+  color: var(--text-primary);
+  
+  /* Effects */
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 2px 8px rgba(193, 230, 241, 0.3);
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: linear-gradient(135deg, #B5D9E8 0%, var(--color-point-hover) 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px rgba(193, 230, 241, 0.4);
+}
+
+.btn-primary:active:not(:disabled) {
+  transform: translateY(0);
+  box-shadow: 0 2px 8px rgba(193, 230, 241, 0.3);
+}
+
+.btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* ========================================
+   2. Secondary Buttons - 보조 액션
+   ======================================== */
+
+.btn-secondary {
+  /* Base Styles */
+  padding: 16px 32px;
+  border-radius: var(--radius-xl);
+  border: 2px solid var(--color-point);
+  
+  /* Typography */
+  font-family: var(--font-main);
+  font-size: var(--font-size-content);
+  font-weight: var(--font-weight-medium);
+  
+  /* Colors */
+  background: var(--color-white);
+  color: var(--text-primary);
+  
+  /* Effects */
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background: var(--color-point);
+  border-color: var(--color-point-hover);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 12px rgba(193, 230, 241, 0.3);
+}
+
+.btn-secondary:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.btn-secondary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  border-color: var(--color-border);
+}
+
+/* ========================================
+   3. Tertiary Buttons - 최소 스타일
+   ======================================== */
+
+.btn-tertiary {
+  /* Base Styles */
+  padding: 12px 24px;
+  border-radius: var(--radius-lg);
+  border: none;
+  
+  /* Typography */
+  font-family: var(--font-main);
+  font-size: var(--font-size-subcontent);
+  font-weight: var(--font-weight-medium);
+  
+  /* Colors */
+  background: transparent;
+  color: var(--text-secondary);
+  
+  /* Effects */
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-tertiary:hover:not(:disabled) {
+  background: var(--color-hover);
+  color: var(--text-primary);
+}
+
+.btn-tertiary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ========================================
+   4. Danger Buttons - 위험한 액션
+   ======================================== */
+
+.btn-danger {
+  /* Base Styles */
+  padding: 16px 32px;
+  border-radius: var(--radius-xl);
+  border: none;
+  
+  /* Typography */
+  font-family: var(--font-main);
+  font-size: var(--font-size-content);
+  font-weight: var(--font-weight-semibold);
+  
+  /* Colors */
+  background: linear-gradient(135deg, #FF6B6B 0%, #EE5A52 100%);
+  color: var(--color-white);
+  
+  /* Effects */
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 2px 8px rgba(255, 107, 107, 0.3);
+}
+
+.btn-danger:hover:not(:disabled) {
+  background: linear-gradient(135deg, #EE5A52 0%, #DC3545 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px rgba(255, 107, 107, 0.4);
+}
+
+.btn-danger:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.btn-danger:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ========================================
+   5. Success Buttons - 긍정적 액션
+   ======================================== */
+
+.btn-success {
+  /* Base Styles */
+  padding: 16px 32px;
+  border-radius: var(--radius-xl);
+  border: none;
+  
+  /* Typography */
+  font-family: var(--font-main);
+  font-size: var(--font-size-content);
+  font-weight: var(--font-weight-semibold);
+  
+  /* Colors */
+  background: linear-gradient(135deg, #69F0AE 0%, #4CAF50 100%);
+  color: var(--color-white);
+  
+  /* Effects */
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 2px 8px rgba(105, 240, 174, 0.3);
+}
+
+.btn-success:hover:not(:disabled) {
+  background: linear-gradient(135deg, #4CAF50 0%, #388E3C 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px rgba(105, 240, 174, 0.4);
+}
+
+.btn-success:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+/* ========================================
+   6. Icon Buttons - 아이콘 전용
+   ======================================== */
+
+.btn-icon {
+  /* Base Styles */
+  width: 48px;
+  height: 48px;
+  padding: 0;
+  border-radius: var(--radius-full);
+  border: none;
+  
+  /* Layout */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  
+  /* Colors */
+  background: var(--color-white);
+  color: var(--text-primary);
+  
+  /* Effects */
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.btn-icon:hover:not(:disabled) {
+  background: var(--color-point);
+  transform: scale(1.05);
+  box-shadow: 0 4px 12px rgba(193, 230, 241, 0.4);
+}
+
+.btn-icon:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.btn-icon-lg {
+  width: 56px;
+  height: 56px;
+  font-size: 24px;
+}
+
+.btn-icon-sm {
+  width: 36px;
+  height: 36px;
+  font-size: 16px;
+}
+
+/* ========================================
+   7. Floating Action Button (FAB)
+   ======================================== */
+
+.btn-fab {
+  /* Base Styles */
+  width: 64px;
+  height: 64px;
+  padding: 0;
+  border-radius: var(--radius-full);
+  border: none;
+  
+  /* Layout */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  
+  /* Position */
+  position: fixed;
+  bottom: var(--spacing-3xl);
+  right: var(--spacing-3xl);
+  z-index: 1000;
+  
+  /* Colors */
+  background: linear-gradient(135deg, var(--color-secondary-purple) 0%, #C8A9E8 100%);
+  color: var(--color-white);
+  
+  /* Effects */
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 4px 20px rgba(213, 188, 255, 0.5);
+}
+
+.btn-fab:hover {
+  transform: scale(1.1) rotate(5deg);
+  box-shadow: 0 6px 30px rgba(213, 188, 255, 0.6);
+}
+
+.btn-fab:active {
+  transform: scale(1.05);
+}
+
+/* ========================================
+   8. Button Groups
+   ======================================== */
+
+.btn-group {
+  display: flex;
+  gap: var(--spacing-md);
+  align-items: center;
+}
+
+.btn-group-vertical {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+}
+
+.btn-group-full {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--spacing-md);
+}
+
+/* ========================================
+   9. Size Variants
+   ======================================== */
+
+.btn-sm {
+  padding: 10px 20px;
+  font-size: var(--font-size-subcontent);
+  border-radius: var(--radius-md);
+}
+
+.btn-lg {
+  padding: 20px 40px;
+  font-size: var(--font-size-subtitle);
+  border-radius: var(--radius-2xl);
+}
+
+.btn-full {
+  width: 100%;
+}
+
+/* ========================================
+   10. Loading State
+   ======================================== */
+
+.btn-loading {
+  position: relative;
+  pointer-events: none;
+  color: transparent !important;
+}
+
+.btn-loading::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 20px;
+  height: 20px;
+  border: 3px solid transparent;
+  border-top-color: currentColor;
+  border-radius: 50%;
+  animation: btn-spin 0.8s linear infinite;
+  color: var(--text-primary);
+}
+
+@keyframes btn-spin {
+  to { transform: translate(-50%, -50%) rotate(360deg); }
+}
+
+/* ========================================
+   11. Pill Buttons - 태그/필터용
+   ======================================== */
+
+.btn-pill {
+  /* Base Styles */
+  padding: 8px 20px;
+  border-radius: var(--radius-full);
+  border: 2px solid var(--color-border);
+  
+  /* Typography */
+  font-family: var(--font-main);
+  font-size: var(--font-size-subcontent);
+  font-weight: var(--font-weight-medium);
+  
+  /* Colors */
+  background: var(--color-white);
+  color: var(--text-secondary);
+  
+  /* Effects */
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-pill:hover {
+  background: var(--color-point);
+  border-color: var(--color-point);
+  color: var(--text-primary);
+}
+
+.btn-pill.active {
+  background: var(--color-point);
+  border-color: var(--color-point-hover);
+  color: var(--text-primary);
+  font-weight: var(--font-weight-semibold);
+}
+
+/* ========================================
+   12. Soft Buttons - 부드러운 느낌
+   ======================================== */
+
+.btn-soft {
+  /* Base Styles */
+  padding: 14px 28px;
+  border-radius: var(--radius-xl);
+  border: none;
+  
+  /* Typography */
+  font-family: var(--font-main);
+  font-size: var(--font-size-content);
+  font-weight: var(--font-weight-medium);
+  
+  /* Colors */
+  background: var(--color-point);
+  color: var(--text-primary);
+  
+  /* Effects */
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.btn-soft:hover:not(:disabled) {
+  background: var(--color-point-hover);
+  transform: scale(1.02);
+}
+
+.btn-soft-purple {
+  background: rgba(213, 188, 255, 0.3);
+  color: var(--color-secondary-purple);
+}
+
+.btn-soft-purple:hover:not(:disabled) {
+  background: rgba(213, 188, 255, 0.5);
+}
+
+/* ========================================
+   13. Glass Morphism Buttons - 모던한 느낌
+   ======================================== */
+
+.btn-glass {
+  /* Base Styles */
+  padding: 16px 32px;
+  border-radius: var(--radius-xl);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  
+  /* Typography */
+  font-family: var(--font-main);
+  font-size: var(--font-size-content);
+  font-weight: var(--font-weight-semibold);
+  
+  /* Glass Effect */
+  background: rgba(255, 255, 255, 0.2);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  color: var(--text-primary);
+  
+  /* Effects */
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+}
+
+.btn-glass:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.3);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.12);
+}
+
+/* ========================================
+   14. Emotion Buttons - 감정 표현
+   ======================================== */
+
+.btn-emotion {
+  /* Base Styles */
+  padding: 12px 24px;
+  border-radius: var(--radius-xl);
+  border: 2px solid transparent;
+  
+  /* Typography */
+  font-family: var(--font-main);
+  font-size: var(--font-size-subcontent);
+  font-weight: var(--font-weight-medium);
+  
+  /* Effects */
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  overflow: hidden;
+}
+
+.btn-emotion::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.5);
+  transform: translate(-50%, -50%);
+  transition: width 0.6s, height 0.6s;
+}
+
+.btn-emotion:active::before {
+  width: 300px;
+  height: 300px;
+}
+
+/* 감정별 색상 */
+.btn-emotion.happy {
+  background: linear-gradient(135deg, #FFE066 0%, #FFD54F 100%);
+  color: var(--text-primary);
+}
+
+.btn-emotion.sad {
+  background: linear-gradient(135deg, #7986CB 0%, #5C6BC0 100%);
+  color: var(--color-white);
+}
+
+.btn-emotion.angry {
+  background: linear-gradient(135deg, #EF5350 0%, #E53935 100%);
+  color: var(--color-white);
+}
+
+.btn-emotion.calm {
+  background: linear-gradient(135deg, #80E8D0 0%, #69F0AE 100%);
+  color: var(--text-primary);
+}
+
+/* ========================================
+   15. Responsive Design
+   ======================================== */
+
+@media (max-width: 768px) {
+  .btn-primary,
+  .btn-secondary,
+  .btn-danger,
+  .btn-success {
+    padding: 14px 24px;
+    font-size: var(--font-size-subcontent);
+  }
+  
+  .btn-lg {
+    padding: 16px 32px;
+    font-size: var(--font-size-content);
+  }
+  
+  .btn-fab {
+    width: 56px;
+    height: 56px;
+    bottom: var(--spacing-xl);
+    right: var(--spacing-xl);
+  }
+  
+  .btn-group-full {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ========================================
+   16. Accessibility
+   ======================================== */
+
+.btn-primary:focus-visible,
+.btn-secondary:focus-visible,
+.btn-tertiary:focus-visible,
+.btn-danger:focus-visible,
+.btn-success:focus-visible,
+.btn-icon:focus-visible,
+.btn-pill:focus-visible,
+.btn-soft:focus-visible,
+.btn-glass:focus-visible {
+  outline: 3px solid var(--color-point);
+  outline-offset: 2px;
+}
+
+/* 고대비 모드 지원 */
+@media (prefers-contrast: high) {
+  .btn-primary,
+  .btn-secondary,
+  .btn-tertiary,
+  .btn-danger,
+  .btn-success {
+    border: 2px solid currentColor;
+  }
+}
+
+/* 모션 감소 모드 지원 */
+@media (prefers-reduced-motion: reduce) {
+  .btn-primary,
+  .btn-secondary,
+  .btn-tertiary,
+  .btn-danger,
+  .btn-success,
+  .btn-icon,
+  .btn-fab,
+  .btn-pill,
+  .btn-soft,
+  .btn-glass,
+  .btn-emotion {
+    transition: none;
+    animation: none;
+  }
+  
+  .btn-primary:hover,
+  .btn-secondary:hover,
+  .btn-icon:hover,
+  .btn-fab:hover {
+    transform: none;
+  }
+}
