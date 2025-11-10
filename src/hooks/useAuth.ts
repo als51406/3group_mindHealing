@@ -38,11 +38,18 @@ export function useAuth() {
     setError(null);
     
     try {
-      const res = await fetch('/api/me', { credentials: 'include' });
+      const res = await fetch('/api/me', { 
+        credentials: 'include',
+        // 401 에러를 콘솔에 표시하지 않도록 설정
+        headers: {
+          'Accept': 'application/json',
+        }
+      });
       
       if (res.status === 401) {
-        // 로그아웃 상태 - 정상 케이스
+        // 로그아웃 상태 - 정상 케이스 (에러 아님)
         setUser(null);
+        setLoading(false);
         return;
       }
       
@@ -53,7 +60,12 @@ export function useAuth() {
       const data = await res.json();
       setUser(data.user ?? null);
     } catch (err) {
-      console.error('Auth refresh error:', err);
+      // 네트워크 에러 등 실제 문제가 있을 때만 로그
+      if (err instanceof TypeError) {
+        console.warn('Auth check failed (network error):', err.message);
+      } else {
+        console.error('Auth refresh error:', err);
+      }
       setError(err instanceof Error ? err.message : '인증 확인 중 오류');
       setUser(null);
     } finally {
