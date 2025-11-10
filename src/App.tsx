@@ -12,6 +12,7 @@ import OrbShowcase from './pages/OrbShowcase';
 import History from './pages/History';
 import Goals from './components/Goals';
 import Profile from './pages/Profile';
+import Support from './pages/Support';
 
 import './styles/theme.css'; // 디자인 시스템 테마
 import './App.css';
@@ -41,6 +42,7 @@ function AppMap() {
           <Route path="/diary" element={<Diary />} />
           <Route path="/chat" element={<Chat />} />
           <Route path="/online" element={<Online />} />
+          <Route path="/support" element={<Support />} />
           <Route path="/profile" element={<Profile />} />
           <Route path="/orb-showcase" element={<OrbShowcase />} />
           <Route path="/history" element={<History />} />
