@@ -127,6 +127,18 @@
     }
 }
 
+/* SiriOrb 말풍선 애니메이션 */
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
 /* --------------------------------------------- 대화 추가 버튼 애니메이션 --------------------------------------------- */
 @keyframes pulse {
     0%, 100% {

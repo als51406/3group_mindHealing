@@ -1549,236 +1549,281 @@ export default function Diary() {
                     {activeTab === 'ai' ? (
                         <>
                             {/* AI 대화 탭 - 기존 UI 유지 */}
-                            <div style={{ ...bgStyle, border: '1px solid #e5e7eb', borderRadius: 12, minHeight: '70vh', padding: 12, position: 'relative', boxSizing: 'border-box', flex: 1 }}>
+                            <div style={{ ...bgStyle, border: '1px solid #e5e7eb', borderRadius: 12, minHeight: '70vh', padding: 12, position: 'relative', boxSizing: 'border-box', flex: 1, marginTop: 40 }}>
                                 {/* 날짜 표시 (우측 상단) */}
                                 <div style={{ position: 'absolute', top: 12, right: 12, fontSize: 18, fontWeight: 700, color: '#1f2937', textShadow: '0 1px 3px rgba(255,255,255,0.8)' }}>
                                     {selectedDate}
                                 </div>
 
-                                {/* 오브 + 감정 진단 섹션 컨테이너 */}
-                                <div style={{
-                                    position: 'absolute',
-                                    top: -25,
-                                    left: '48%',
-                                    transform: 'translateX(-50%)',
-                                    width: '62vw',
+                                {/* 피드백 섹션 (Feedback Section) - 오브 + 감정 진단 */}
+                                <div className="feedback-section" style={{
+                                    position: 'relative',
+                                    width: '100%',
+                                    padding: '20px 0',
+                                    marginBottom: 20,
                                     display: 'flex',
                                     alignItems: 'flex-start',
-                                    justifyContent: 'space-between',
+                                    justifyContent: 'center',
                                     gap: 20,
-                                    zIndex: 20
+                                    minHeight: 200
                                 }}>
-                                    {/* 감정 오브: 왼쪽 */}
+                                    {/* SiriOrb와 말풍선 컨테이너 - 가로 배치 */}
                                     <div style={{
-                                        pointerEvents: 'none',
-                                        width: 200,
-                                        height: 200,
+                                        position: 'relative',
                                         display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        flexShrink: 0
+                                        flexDirection: 'row',
+                                        alignItems: 'flex-start',
+                                        gap: 20,
+                                        flexShrink: 0,
+                                        width: '100%',
+                                        justifyContent: 'flex-start'
                                     }}>
-                                        <div className="aurora-breathe" style={{
-                                            width: 200,
-                                            height: 200,
+                                        {/* SiriOrb - 왼쪽 */}
+                                        <div style={{
+                                            pointerEvents: 'none',
+                                            width: 180,
+                                            height: 180,
                                             display: 'flex',
                                             alignItems: 'center',
                                             justifyContent: 'center',
-                                            transformOrigin: 'center center',
-                                            filter: 'drop-shadow(0 0 8px rgba(0, 0, 0, 0.3)) drop-shadow(0 2px 16px rgba(0, 0, 0, 0.2))'
+                                            flexShrink: 0
                                         }}>
-                                            <WebGLErrorBoundary>
-                                                <SiriOrb
-                                                    color={emotionOrbColor}
-                                                    size={200}
-                                                    intensity={0.85}
-                                                    analyzing={isWaitingAnalysis}
-                                                    showCompleted={showCompletedAnimation}
-                                                    messageCount={messageCount}
-                                                />
-                                            </WebGLErrorBoundary>
-                                        </div>
-                                    </div>
-
-                                    
-
-                                {/* 매칭 제안 대화창 */}
-                                {showMatchingSuggestion && (
-                                    <div className="matching-suggestion-bubble">
-                                        <div className="matching-suggestion-content">
-                                            <p>감정 진단이 완료되었습니다! 다른 사용자와 매칭하여 대화를 해보시겠어요?</p>
-                                            <div className="matching-suggestion-buttons">
-                                                <button 
-                                                    className="matching-btn match"
-                                                    onClick={() => {
-                                                        setShowMatchingSuggestion(false);
-                                                        navigate('/online');
-                                                    }}
-                                                >
-                                                    매칭하기
-                                                </button>
-                                                <button 
-                                                    className="matching-btn later"
-                                                    onClick={() => setShowMatchingSuggestion(false)}
-                                                >
-                                                    잠깐만요
-                                                </button>
-                                            </div>
-                                        </div>
-                                    </div>
-                                )}
-                                {/* 감정 진단 섹션: 오른쪽 */}
-                                    <div style={{
-                                        background: 'transparent',
-                                        borderRadius: 16,
-                                        padding: '14px 24px',
-                                        border: '2px solid transparent',
-                                        backgroundImage: 'linear-gradient(white, white), linear-gradient(135deg, #667eea 0%, #764ba2 25%, #f093fb 50%, #4facfe 75%, #667eea 100%)',
-                                        backgroundOrigin: 'border-box',
-                                        backgroundClip: 'padding-box, border-box',
-                                        minWidth:"340px",
-                                        marginTop: 55,
-                                        transition: 'all 0.3s ease',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'space-between',
-                                        gap: 20
-                                    }}>
-                                    {/* 좌측: 아이콘 + 상태 정보 */}
-                                    <div style={{
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: 12,
-                                        flex: 1
-                                    }}>
-                                        <span style={{ fontSize: 28, filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.2))' }}>
-                                            {mood ? '✨' : isAnalyzing ? '🔄' : '📊'}
-                                        </span>
-                                        <div style={{ flex: 1 }}>
-                                            <div style={{
-                                                fontWeight: 700,
-                                                fontSize: 16,
-                                                marginBottom: 4,
-                                                color: '#000',
-                                                textShadow: '0 1px 2px rgba(255,255,255,0.8)'
+                                            <div className="aurora-breathe" style={{
+                                                width: 180,
+                                                height: 180,
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                transformOrigin: 'center center',
+                                                filter: 'drop-shadow(0 0 8px rgba(0, 0, 0, 0.3)) drop-shadow(0 2px 16px rgba(0, 0, 0, 0.2))'
                                             }}>
-                                                {mood
-                                                    ? '진단 완료'
-                                                    : isAnalyzing
-                                                        ? '진단중...'
-                                                        : `진단전 (${messageCount}/${MIN_REQUIRED_MESSAGES})`
-                                                }
+                                                <WebGLErrorBoundary>
+                                                    <SiriOrb
+                                                        color={emotionOrbColor}
+                                                        size={180}
+                                                        intensity={0.85}
+                                                        analyzing={isWaitingAnalysis}
+                                                        showCompleted={showCompletedAnimation}
+                                                        messageCount={messageCount}
+                                                    />
+                                                </WebGLErrorBoundary>
                                             </div>
-                                            {mood && (
-                                                <div style={{
-                                                    fontSize: 14,
-                                                    color: '#000',
-                                                    textShadow: '0 1px 2px rgba(255,255,255,0.8)'
-                                                }}>
-                                                    감정: <strong>{mood.emotion}</strong> ({Math.round(mood.score * 100)}%)
-                                                </div>
-                                            )}
-                                            {!mood && !isAnalyzing && messageCount >= 2 && (
-                                                <div style={{
-                                                    fontSize: 13,
-                                                    color: '#000',
-                                                    textShadow: '0 1px 2px rgba(255,255,255,0.8)'
-                                                }}>
-                                                    {messageCount >= MIN_REQUIRED_MESSAGES
-                                                        ? '감정 분석을 시작할 수 있습니다'
-                                                        : `${MIN_REQUIRED_MESSAGES - messageCount}번 더 대화하면 분석 가능합니다`
-                                                    }
-                                                </div>
-                                            )}
                                         </div>
-                                    </div>
 
-                                    {/* 중앙: 컬러 코드 (진단 완료 시) */}
-                                    {mood && (
+                                        {/* 말풍선 - 오른쪽 */}
                                         <div style={{
-                                            padding: '10px 16px',
-                                            borderRadius: 10,
-                                            background: 'rgba(255, 255, 255, 0.85)',
-                                            backdropFilter: 'blur(8px)',
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            gap: 10,
-                                            border: '2px solid rgba(255,255,255,0.5)',
-                                            boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+                                            position: 'relative',
+                                            flex: 1,
+                                            minWidth: 320,
+                                            maxWidth: 500,
+                                            background: 'rgba(255, 255, 255, 0.95)',
+                                            backdropFilter: 'blur(12px)',
+                                            borderRadius: 20,
+                                            padding: '20px 24px',
+                                            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.12), 0 2px 8px rgba(0, 0, 0, 0.08)',
+                                            border: '2px solid rgba(255, 255, 255, 0.8)',
+                                            animation: 'fadeInUp 0.5s ease-out'
                                         }}>
-                                            <span style={{
-                                                fontWeight: 600,
-                                                fontSize: 13,
-                                                color: '#374151'
-                                            }}>
-                                                컬러 코드:
-                                            </span>
+                                            {/* 말풍선 꼬리 - 왼쪽으로 */}
                                             <div style={{
-                                                width: 28,
-                                                height: 28,
-                                                borderRadius: 6,
-                                                background: mood.color,
-                                                border: '2px solid rgba(0,0,0,0.15)',
-                                                boxShadow: '0 2px 4px rgba(0,0,0,0.15)'
+                                                position: 'absolute',
+                                                left: -10,
+                                                top: 30,
+                                                width: 0,
+                                                height: 0,
+                                                borderTop: '12px solid transparent',
+                                                borderBottom: '12px solid transparent',
+                                                borderRight: '12px solid rgba(255, 255, 255, 0.95)',
+                                                filter: 'drop-shadow(-2px 0 4px rgba(0, 0, 0, 0.08))'
                                             }} />
-                                            <code style={{
-                                                padding: '4px 10px',
-                                                borderRadius: 6,
-                                                background: 'rgba(0,0,0,0.06)',
-                                                fontFamily: 'monospace',
-                                                fontSize: 13,
-                                                fontWeight: 600,
-                                                color: '#1f2937',
-                                                border: '1px solid rgba(0,0,0,0.08)'
+
+                                            {/* 말풍선 내용 */}
+                                            <div style={{
+                                                display: 'flex',
+                                                flexDirection: 'column',
+                                                gap: 16
                                             }}>
-                                                {mood.color}
-                                            </code>
+                                                {/* 메시지 텍스트 */}
+                                                <div style={{
+                                                    fontSize: 15,
+                                                    lineHeight: 1.6,
+                                                    color: '#1f2937',
+                                                    fontWeight: 500
+                                                }}>
+                                                    {mood ? (
+                                                        <>
+                                                            <span style={{ fontSize: 18, marginRight: 6 }}>✨</span>
+                                                            <strong>감정 진단이 완료되었어요!</strong>
+                                                            <div style={{ 
+                                                                marginTop: 12,
+                                                                padding: '12px 16px',
+                                                                background: 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%)',
+                                                                borderRadius: 12,
+                                                                border: '1px solid #bae6fd'
+                                                            }}>
+                                                                <div style={{ fontSize: 14, color: '#0369a1', marginBottom: 8 }}>
+                                                                    감정: <strong style={{ fontSize: 16 }}>{mood.emotion}</strong> ({Math.round(mood.score * 100)}%)
+                                                                </div>
+                                                                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                                                    <span style={{ fontSize: 13, color: '#0369a1' }}>컬러:</span>
+                                                                    <div style={{
+                                                                        width: 24,
+                                                                        height: 24,
+                                                                        borderRadius: 6,
+                                                                        background: mood.color,
+                                                                        border: '2px solid rgba(0,0,0,0.1)',
+                                                                        boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                                                                    }} />
+                                                                    <code style={{
+                                                                        fontSize: 12,
+                                                                        fontFamily: 'monospace',
+                                                                        color: '#0c4a6e',
+                                                                        fontWeight: 600
+                                                                    }}>
+                                                                        {mood.color}
+                                                                    </code>
+                                                                </div>
+                                                            </div>
+                                                        </>
+                                                    ) : isAnalyzing ? (
+                                                        <>
+                                                            <span style={{ fontSize: 18, marginRight: 6 }}>🔄</span>
+                                                            <strong>감정을 분석하고 있어요...</strong>
+                                                        </>
+                                                    ) : messageCount >= MIN_REQUIRED_MESSAGES ? (
+                                                        <>
+                                                            <span style={{ fontSize: 18, marginRight: 6 }}>💬</span>
+                                                            <strong>충분한 대화가 쌓였어요!</strong>
+                                                            <div style={{ marginTop: 8, fontSize: 14, color: '#6b7280' }}>
+                                                                이제 감정 진단을 받을 수 있습니다.
+                                                            </div>
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <span style={{ fontSize: 18, marginRight: 6 }}>👋</span>
+                                                            <strong>안녕하세요! 당신의 감정을 분석해드려요.</strong>
+                                                            <div style={{ marginTop: 8, fontSize: 14, color: '#6b7280' }}>
+                                                                현재 대화: {messageCount}/{MIN_REQUIRED_MESSAGES}개
+                                                                {messageCount >= 2 && (
+                                                                    <span style={{ display: 'block', marginTop: 4 }}>
+                                                                        {MIN_REQUIRED_MESSAGES - messageCount}번 더 대화하면 진단할 수 있어요!
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                        </>
+                                                    )}
+                                                </div>
+
+                                                {/* 액션 버튼들 */}
+                                                <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+                                                    {/* 수동 진단 버튼 */}
+                                                    {!mood && messageCount >= 2 && !isAnalyzing && (
+                                                        <button
+                                                            onClick={manualAnalyze}
+                                                            style={{
+                                                                padding: '10px 20px',
+                                                                borderRadius: 10,
+                                                                border: 'none',
+                                                                background: messageCount >= MIN_REQUIRED_MESSAGES
+                                                                    ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
+                                                                    : 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
+                                                                color: '#fff',
+                                                                cursor: 'pointer',
+                                                                fontWeight: 700,
+                                                                fontSize: 14,
+                                                                boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                                                                transition: 'all 0.2s ease',
+                                                                whiteSpace: 'nowrap'
+                                                            }}
+                                                            onMouseEnter={(e) => {
+                                                                e.currentTarget.style.transform = 'translateY(-2px)';
+                                                                e.currentTarget.style.boxShadow = '0 6px 16px rgba(0,0,0,0.2)';
+                                                            }}
+                                                            onMouseLeave={(e) => {
+                                                                e.currentTarget.style.transform = 'translateY(0)';
+                                                                e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)';
+                                                            }}
+                                                        >
+                                                            🧠 감정 진단하기
+                                                        </button>
+                                                    )}
+
+                                                    {/* 매칭 제안 버튼들 */}
+                                                    {showMatchingSuggestion && mood && (
+                                                        <>
+                                                            <button
+                                                                onClick={() => {
+                                                                    setShowMatchingSuggestion(false);
+                                                                    navigate('/online');
+                                                                }}
+                                                                style={{
+                                                                    padding: '10px 20px',
+                                                                    borderRadius: 10,
+                                                                    border: 'none',
+                                                                    background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+                                                                    color: '#fff',
+                                                                    cursor: 'pointer',
+                                                                    fontWeight: 700,
+                                                                    fontSize: 14,
+                                                                    boxShadow: '0 4px 12px rgba(59, 130, 246, 0.3)',
+                                                                    transition: 'all 0.2s ease'
+                                                                }}
+                                                                onMouseEnter={(e) => {
+                                                                    e.currentTarget.style.transform = 'translateY(-2px)';
+                                                                    e.currentTarget.style.boxShadow = '0 6px 16px rgba(59, 130, 246, 0.4)';
+                                                                }}
+                                                                onMouseLeave={(e) => {
+                                                                    e.currentTarget.style.transform = 'translateY(0)';
+                                                                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(59, 130, 246, 0.3)';
+                                                                }}
+                                                            >
+                                                                💬 매칭하기
+                                                            </button>
+                                                            <button
+                                                                onClick={() => setShowMatchingSuggestion(false)}
+                                                                style={{
+                                                                    padding: '10px 20px',
+                                                                    borderRadius: 10,
+                                                                    border: '2px solid #e5e7eb',
+                                                                    background: '#fff',
+                                                                    color: '#6b7280',
+                                                                    cursor: 'pointer',
+                                                                    fontWeight: 600,
+                                                                    fontSize: 14,
+                                                                    transition: 'all 0.2s ease'
+                                                                }}
+                                                                onMouseEnter={(e) => {
+                                                                    e.currentTarget.style.borderColor = '#d1d5db';
+                                                                    e.currentTarget.style.background = '#f9fafb';
+                                                                }}
+                                                                onMouseLeave={(e) => {
+                                                                    e.currentTarget.style.borderColor = '#e5e7eb';
+                                                                    e.currentTarget.style.background = '#fff';
+                                                                }}
+                                                            >
+                                                                나중에
+                                                            </button>
+                                                        </>
+                                                    )}
+                                                </div>
+                                            </div>
                                         </div>
-                                    )}
-
-                                    {/* 우측: 진단하기 버튼 */}
-                                    {!mood && messageCount >= 2 && !isAnalyzing && (
-                                        <button
-                                            onClick={manualAnalyze}
-                                            style={{
-                                                padding: '10px 20px',
-                                                borderRadius: 10,
-                                                border: '2px solid rgba(255,255,255,0.4)',
-                                                background: messageCount >= MIN_REQUIRED_MESSAGES
-                                                    ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
-                                                    : 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
-                                                color: '#fff',
-                                                cursor: 'pointer',
-                                                fontWeight: 700,
-                                                fontSize: 14,
-                                                boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
-                                                transition: 'all 0.2s ease',
-                                                whiteSpace: 'nowrap',
-                                                flexShrink: 0,
-                                                textShadow: '0 1px 2px rgba(0,0,0,0.2)'
-                                            }}
-                                            onMouseEnter={(e) => {
-                                                e.currentTarget.style.transform = 'translateY(-1px)';
-                                                e.currentTarget.style.boxShadow = '0 6px 16px rgba(0,0,0,0.25)';
-                                            }}
-                                            onMouseLeave={(e) => {
-                                                e.currentTarget.style.transform = 'translateY(0)';
-                                                e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.2)';
-                                            }}
-                                        >
-                                            🧠 감정 진단
-                                        </button>
-                                    )}
+                                    </div>
                                 </div>
-                            </div>
 
-                                <div style={{ display: 'flex', flexDirection: 'row', justifyContent: 'center', gap: '1vw' }}>
+                                {/* 채팅 섹션 (Chat Section) */}
+                                <div className="chat-section" style={{ 
+                                    display: 'flex', 
+                                    flexDirection: 'column',
+                                    gap: 12,
+                                    marginTop: 20
+                                }}>
 
                                     {/* 채팅 영역 */}
-                                    <div className="diary_chat_area" style={{ position: 'relative' }}>
+                                    <div className="diary_chat_area" style={{ position: 'relative', width: '100%' }}>
 
                                         {/* 채팅 로그 */}
-                                        <div className="diary_chat_log" style={{ border: '1px solid #e5e7eb', borderRadius: 12, height: '55vh', maxHeight: '55vh', padding: 12, overflowY: 'auto', background: 'rgba(255,255,255,0.75)', margin: '15vh 0 0', boxSizing: 'border-box', position: 'relative' }}>
+                                        <div className="diary_chat_log" style={{ border: '1px solid #e5e7eb', borderRadius: 12, height: '50vh', maxHeight: '50vh', padding: 12, overflowY: 'auto', background: 'rgba(255,255,255,0.75)', boxSizing: 'border-box', position: 'relative' }}>
 
                                             {/* 과거 날짜 경고 오버레이 */}
                                             {!isToday && (
@@ -1892,6 +1937,7 @@ export default function Diary() {
                                         </form>
                                     </div>
                                 </div>
+
                             </div>
                         </>
                     ) : (
