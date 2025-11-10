@@ -1,5 +1,6 @@
 // MatchingSuggestionModal.tsx - 감정 진단 완료 후 매칭 시스템 권유 모달
 import { useNavigate } from 'react-router-dom';
+import { getEmotionColorConfig } from '../utils/emotionColorUtils';
 import './MatchingSuggestionModal.css';
 
 interface MatchingSuggestionModalProps {
@@ -10,6 +11,9 @@ interface MatchingSuggestionModalProps {
 
 export default function MatchingSuggestionModal({ emotion, color, onClose }: MatchingSuggestionModalProps) {
   const navigate = useNavigate();
+  
+  // 감정 색상 설정 가져오기
+  const colorConfig = getEmotionColorConfig(emotion);
 
   const handleGoToMatching = () => {
     onClose();
@@ -38,8 +42,14 @@ export default function MatchingSuggestionModal({ emotion, color, onClose }: Mat
       <div className="matching-suggestion-modal" onClick={(e) => e.stopPropagation()}>
         {/* 헤더 */}
         <div className="matching-modal-header">
-          <div className="matching-modal-icon" style={{ backgroundColor: color }}>
-            💬
+          <div 
+            className="matching-modal-color-badge" 
+            style={{ 
+              backgroundColor: colorConfig.background,
+              color: colorConfig.text
+            }}
+          >
+            {colorConfig.colorName}
           </div>
           <button className="matching-modal-close" onClick={handleStayInDiary}>
             ✕
@@ -78,8 +88,9 @@ export default function MatchingSuggestionModal({ emotion, color, onClose }: Mat
           <button 
             className="matching-modal-btn matching-modal-btn-primary"
             style={{ 
-              backgroundColor: color,
-              borderColor: color
+              backgroundColor: colorConfig.background,
+              borderColor: colorConfig.background,
+              color: colorConfig.text
             }}
             onClick={handleGoToMatching}
           >
