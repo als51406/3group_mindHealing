@@ -5,13 +5,12 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import StreakWidget from "../components/StreakWidget";
-import { useAuth } from "../hooks/useAuth";
 import './Home.css';
 
-
-
-function LoggedOutView({ navigate }: { navigate: any }) {
+export default function Home() {
+    const navigate = useNavigate();
     const [inputText, setInputText] = useState("");
+    
     const firstChat = (event: React.FormEvent<HTMLFormElement>) => {
         event.preventDefault();
         const text = inputText.trim();
@@ -41,32 +40,4 @@ function LoggedOutView({ navigate }: { navigate: any }) {
             </div>
         </div>
     )
-}
-
-// 로그인 후 화면
-function LoggedInView() {
-    return (
-        <div id="home-loggedin-wrap">
-            <div className="home-grid">
-                <div className="top-content">
-                    <div className="emotion-graph">감정 그래프</div>
-                    <div className="home-profile-card">
-                         {/* <ProfileCard profile={{ ...profile, bio }} showOnline={true} /> */}
-                    </div>
-                </div>
-                <div className="sub-content">
-                    <div className="diary-preview">다이어리</div>
-                    <div className="goals-list">목표</div>
-               </div>
-            </div>
-        </div>
-    )
-}
-
-export default function Home() {
-    const navigate = useNavigate();
-    const { user, loading } = useAuth();
-
-    if (loading) return null;
-    return user ? <LoggedInView /> : <LoggedOutView navigate={navigate} />;
 }
