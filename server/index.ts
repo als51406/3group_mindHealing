@@ -14,6 +14,7 @@ if (fs.existsSync(envPath)) {
 import express from 'express';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
+import rateLimit from 'express-rate-limit';
 import { MongoClient, ObjectId } from 'mongodb';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
@@ -24,7 +25,7 @@ const MONGO_URI = process.env.MONGO_URI || '';
 const DB_NAME = process.env.DB_NAME || 'appdb';
 // Vite proxy in vite.config.ts targets 7780; use that as default here for out-of-the-box dev.
 const PORT = Number(process.env.PORT || 7780);
-const JWT_SECRET = process.env.JWT_SECRET || 'dev_secret';
+const JWT_SECRET = process.env.JWT_SECRET || '';
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || '';
 // 기본 모델
 const OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-4o-mini';
@@ -139,23 +140,117 @@ function assertEnv() {
   if (!DB_NAME) missing.push('DB_NAME');
   if (!JWT_SECRET) missing.push('JWT_SECRET');
   if (!PORT) missing.push('PORT');
+  if (!OPENAI_API_KEY) missing.push('OPENAI_API_KEY');
+  
+  // JWT_SECRET이 기본값이거나 너무 짧으면 에러
+  if (JWT_SECRET === 'dev_secret') {
+    console.error('⚠️ JWT_SECRET은 "dev_secret"이 아닌 강력한 값으로 설정해야 합니다.');
+    console.error('💡 예시: openssl rand -base64 32');
+    process.exit(1);
+  }
+  
+  if (JWT_SECRET.length < 32) {
+    console.error('⚠️ JWT_SECRET은 최소 32자 이상이어야 합니다.');
+    console.error('💡 현재 길이:', JWT_SECRET.length);
+    process.exit(1);
+  }
+  
   if (missing.length) {
-    console.error('필수 환경변수가 누락되었습니다:', missing.join(', '));
+    console.error('⚠️ 필수 환경변수가 누락되었습니다:', missing.join(', '));
+    console.error('📝 .env 파일을 확인하세요.');
     process.exit(1);
   }
 }
 assertEnv();
 
+// CORS 허용 도메인 설정
+const ALLOWED_ORIGINS = [
+  'http://localhost:5173',      // Vite dev server
+  'http://localhost:7780',      // API server (self)
+  'http://127.0.0.1:5173',
+  'http://127.0.0.1:7780',
+  process.env.FRONTEND_URL,     // 프로덕션 프론트엔드 URL
+].filter(Boolean) as string[];
+
+// 네트워크 IP 자동 추가 (개발 환경)
+if (process.env.NODE_ENV !== 'production') {
+  const networkIP = getNetworkIP();
+  ALLOWED_ORIGINS.push(`http://${networkIP}:5173`);
+  ALLOWED_ORIGINS.push(`http://${networkIP}:7780`);
+}
+
 const app = express();
 // Allow cookies via CORS when frontend and API are on different origins (or proxied via Vite)
 app.use(
   cors({
-    origin: (_origin, cb) => cb(null, true), // reflect request origin
+    origin: (origin, callback) => {
+      // origin이 없는 경우 허용 (same-origin 요청, Postman 등)
+      if (!origin) return callback(null, true);
+      
+      if (ALLOWED_ORIGINS.includes(origin)) {
+        callback(null, true);
+      } else {
+        console.warn('🚫 CORS 차단:', origin);
+        callback(new Error(`CORS 정책에 의해 차단되었습니다: ${origin}`));
+      }
+    },
     credentials: true,
   })
 );
 app.use(express.json());
 app.use(cookieParser());
+
+// ==================== Rate Limiting 설정 ====================
+
+// 일반 API 제한 (모든 엔드포인트)
+const generalLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15분
+  max: 300, // 최대 300회 (100에서 증가)
+  message: '너무 많은 요청을 보냈습니다. 잠시 후 다시 시도해주세요.',
+  standardHeaders: true,
+  legacyHeaders: false,
+  // 특정 경로는 제외
+  skip: (req) => {
+    const path = req.path;
+    // 인증 확인, health check 등은 제외
+    return path === '/api/me' || 
+           path === '/api/health' || 
+           path === '/api/logout' ||
+           path.startsWith('/api/user/emotion-stats') ||
+           path.startsWith('/api/diary/today-emotion');
+  },
+});
+
+// 로그인/회원가입 제한 (브루트포스 방지)
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15분
+  max: 5, // 최대 5회
+  message: '너무 많은 로그인 시도입니다. 15분 후 다시 시도해주세요.',
+  standardHeaders: true,
+  legacyHeaders: false,
+  skipSuccessfulRequests: true, // 성공한 요청은 카운트 제외
+});
+
+// AI API 제한 (OpenAI 크레딧 보호)
+const aiLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1분
+  max: 10, // 최대 10회
+  message: 'AI 요청이 너무 많습니다. 잠시 후 다시 시도해주세요.',
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// 이미지 업로드 제한
+const uploadLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1시간
+  max: 20, // 최대 20회
+  message: '이미지 업로드 횟수를 초과했습니다. 1시간 후 다시 시도해주세요.',
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// 일반 제한을 모든 API에 적용
+app.use('/api/', generalLimiter);
 
 let cachedClient: MongoClient | null = null;
 async function getClient() {
@@ -179,28 +274,46 @@ async function ensureIndexes() {
   try {
     const client = await getClient();
     const db = client.db(DB_NAME);
+    
+    console.log('📊 MongoDB 인덱스 생성 시작...');
+    
+    // 필수 인덱스 생성
     await db.collection('users').createIndex({ email: 1 }, { unique: true, name: 'uniq_email' });
-  await db.collection('messages').createIndex({ userId: 1, createdAt: 1 }, { name: 'by_user_time' });
-  await db.collection('ai_messages').createIndex({ userId: 1, createdAt: 1 }, { name: 'ai_by_user_time' });
+    await db.collection('messages').createIndex({ userId: 1, createdAt: 1 }, { name: 'by_user_time' });
+    await db.collection('ai_messages').createIndex({ userId: 1, createdAt: 1 }, { name: 'ai_by_user_time' });
+    
     // 다이어리: 날짜별(YYYY-MM-DD)로 1개 문서, 사용자별 고유
     await db.collection('diaries').createIndex(
       { userId: 1, date: 1 },
       { unique: true, name: 'uniq_user_date' }
     );
+    
     // 다이어리 메시지(대화) 인덱스
     await db.collection('diary_messages').createIndex(
       { diaryId: 1, createdAt: 1 },
       { name: 'by_diary_time' }
     );
-  // 세션(한 날짜에 여러 대화 허용)
-  await db.collection('diary_sessions').createIndex({ userId: 1, createdAt: 1 }, { name: 'session_by_user_time' });
-  await db.collection('diary_session_messages').createIndex({ sessionId: 1, createdAt: 1 }, { name: 'by_session_time' });
-  // 온라인 채팅 메시지 인덱스
-  await db.collection('online_messages').createIndex({ createdAt: 1 }, { name: 'online_by_time' });
-  // feedback indices
-  await db.collection('emotion_color_feedback').createIndex({ userId: 1, emotion: 1, createdAt: -1 }, { name: 'by_user_emotion_time' });
+    
+    // 세션(한 날짜에 여러 대화 허용)
+    await db.collection('diary_sessions').createIndex({ userId: 1, createdAt: 1 }, { name: 'session_by_user_time' });
+    await db.collection('diary_session_messages').createIndex({ sessionId: 1, createdAt: 1 }, { name: 'by_session_time' });
+    
+    // 온라인 채팅 메시지 인덱스
+    await db.collection('online_messages').createIndex({ createdAt: 1 }, { name: 'online_by_time' });
+    
+    // 목표 인덱스
+    await db.collection('goals').createIndex({ userId: 1, status: 1, createdAt: -1 }, { name: 'goals_by_user_status' });
+    
+    // 감정 피드백 인덱스
+    await db.collection('emotion_color_feedback').createIndex({ userId: 1, emotion: 1, createdAt: -1 }, { name: 'by_user_emotion_time' });
+    
+    // 인덱스 생성 확인
+    const indexes = await db.collection('users').indexes();
+    console.log('✅ 인덱스 생성 완료:', indexes.map(i => i.name).join(', '));
   } catch (e) {
-    console.warn('Index creation skipped:', (e as Error).message);
+    console.error('❌ 인덱스 생성 실패:', (e as Error).message);
+    console.error('💡 데이터베이스 연결을 확인하고 서버를 재시작하세요.');
+    throw e; // 인덱스 생성 실패 시 서버 시작 중단
   }
 }
 
@@ -221,7 +334,7 @@ function authMiddleware(req: any, res: express.Response, next: express.NextFunct
 }
 
 // POST /api/login { email, password }
-app.post('/api/login', async (req, res) => {
+app.post('/api/login', authLimiter, async (req, res) => {
   try {
     const { email, password } = req.body || {};
     if (!email || !password) {
@@ -245,8 +358,8 @@ app.post('/api/login', async (req, res) => {
     const token = signToken({ id: String(user._id), email: user.email });
     res.cookie('token', token, {
       httpOnly: true,
-      sameSite: 'lax',
-      secure: false,
+      sameSite: process.env.NODE_ENV === 'production' ? 'strict' : 'lax',
+      secure: process.env.NODE_ENV === 'production',
       maxAge: 7 * 24 * 60 * 60 * 1000,
       path: '/',
     });
@@ -258,7 +371,7 @@ app.post('/api/login', async (req, res) => {
 });
 
 // POST /api/register { email, password }
-app.post('/api/register', async (req, res) => {
+app.post('/api/register', authLimiter, async (req, res) => {
   try {
     const { email, password } = req.body || {};
     if (!email || !password) {
@@ -435,8 +548,8 @@ app.put('/api/profile/change-password', authMiddleware, async (req: any, res) =>
       return res.status(404).json({ message: '사용자를 찾을 수 없습니다.' });
     }
     
-    // 현재 비밀번호 확인
-    const isMatch = await bcrypt.compare(currentPassword, user.passwordHash);
+    // 현재 비밀번호 확인 (password 필드로 통일)
+    const isMatch = await bcrypt.compare(currentPassword, user.password);
     if (!isMatch) {
       return res.status(401).json({ message: '현재 비밀번호가 일치하지 않습니다.' });
     }
@@ -444,10 +557,10 @@ app.put('/api/profile/change-password', authMiddleware, async (req: any, res) =>
     // 새 비밀번호 해싱
     const newPasswordHash = await bcrypt.hash(newPassword, 10);
     
-    // 비밀번호 업데이트
+    // 비밀번호 업데이트 (password 필드로 통일)
     await users.updateOne(
       { _id: new ObjectId(userId) },
-      { $set: { passwordHash: newPasswordHash } }
+      { $set: { password: newPasswordHash } }
     );
     
     return res.json({ ok: true, message: '비밀번호가 성공적으로 변경되었습니다.' });
@@ -458,7 +571,7 @@ app.put('/api/profile/change-password', authMiddleware, async (req: any, res) =>
 });
 
 // 이미지 업로드 (임시: base64 저장)
-app.post('/api/profile/upload-image', authMiddleware, async (req: any, res) => {
+app.post('/api/profile/upload-image', authMiddleware, uploadLimiter, async (req: any, res) => {
   try {
     // 실제 프로덕션에서는 AWS S3, Cloudinary 등 사용 권장
     // 여기서는 간단히 base64를 DB에 저장하는 방식으로 구현
@@ -592,7 +705,7 @@ app.get('/api/chat', authMiddleware, async (req: any, res) => {
   }
 });
 
-app.post('/api/chat', authMiddleware, async (req: any, res) => {
+app.post('/api/chat', authMiddleware, aiLimiter, async (req: any, res) => {
   try {
     const { text } = req.body || {};
     if (!text || typeof text !== 'string') return res.status(400).json({ message: 'text가 필요합니다.' });
@@ -2879,7 +2992,7 @@ ${tomorrowPattern ? `과거 데이터에 따르면 ${tomorrowPattern.dayName}요
 });
 
 // POST /api/diary/session/:id/chat { text }
-app.post('/api/diary/session/:id/chat', authMiddleware, async (req: any, res) => {
+app.post('/api/diary/session/:id/chat', authMiddleware, aiLimiter, async (req: any, res) => {
   try {
     if (!OPENAI_API_KEY) return res.status(500).json({ message: 'OPENAI_API_KEY 미설정' });
     const id = String(req.params.id || '').trim();
