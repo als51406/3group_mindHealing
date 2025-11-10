@@ -1,0 +1,29 @@
+* {
+    margin: 0;
+    padding: 0;
+}
+
+nav {
+    width: 100vw;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    padding: 0.75rem 1.5rem;
+    z-index: 1;
+}
+
+nav.main {
+    position: absolute;
+    background-color: transparent;
+}
+
+nav:not(.main) {
+    position: static;
+    background-color: white;
+}
+
+.nav-center {
+    display: flex;
+    align-items: center;
+}
