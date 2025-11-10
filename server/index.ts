@@ -307,6 +307,10 @@ async function ensureIndexes() {
     // 감정 피드백 인덱스
     await db.collection('emotion_color_feedback').createIndex({ userId: 1, emotion: 1, createdAt: -1 }, { name: 'by_user_emotion_time' });
     
+    // 고객센터 문의 인덱스
+    await db.collection('support_inquiries').createIndex({ userId: 1, createdAt: -1 }, { name: 'support_by_user_time' });
+    await db.collection('support_inquiries').createIndex({ status: 1, createdAt: -1 }, { name: 'support_by_status_time' });
+    
     // 인덱스 생성 확인
     const indexes = await db.collection('users').indexes();
     console.log('✅ 인덱스 생성 완료:', indexes.map(i => i.name).join(', '));
@@ -441,6 +445,135 @@ app.get('/api/me', authMiddleware, async (req: any, res) => {
 app.post('/api/logout', (req, res) => {
   res.clearCookie('token', { path: '/' });
   res.json({ ok: true });
+});
+
+// ==================== 고객센터 / 문의하기 API ====================
+
+// POST /api/support/inquiry - 문의하기
+app.post('/api/support/inquiry', authMiddleware, async (req: any, res) => {
+  try {
+    const client = await getClient();
+    const db = client.db(DB_NAME);
+    const inquiries = db.collection('support_inquiries');
+    
+    const userId = req.user.sub;
+    const { name, email, category, title, content } = req.body;
+    
+    if (!name || !email || !category || !title || !content) {
+      return res.status(400).json({ message: '모든 필드를 입력해주세요.' });
+    }
+    
+    const inquiry = {
+      userId,
+      name,
+      email,
+      category,
+      title,
+      content,
+      status: 'waiting', // 'waiting', 'answered'
+      answer: null,
+      createdAt: new Date(),
+      answeredAt: null
+    };
+    
+    const result = await inquiries.insertOne(inquiry);
+    
+    console.log('✉️ 문의 접수:', {
+      userId,
+      email,
+      category,
+      title: title.slice(0, 20)
+    });
+    
+    return res.status(201).json({
+      ok: true,
+      message: '문의가 성공적으로 접수되었습니다.',
+      inquiryId: String(result.insertedId)
+    });
+  } catch (e) {
+    console.error('문의 접수 실패:', e);
+    return res.status(500).json({ message: '서버 오류가 발생했습니다.' });
+  }
+});
+
+// GET /api/support/inquiries - 내 문의 내역 조회
+app.get('/api/support/inquiries', authMiddleware, async (req: any, res) => {
+  try {
+    const client = await getClient();
+    const db = client.db(DB_NAME);
+    const inquiries = db.collection('support_inquiries');
+    
+    const userId = req.user.sub;
+    
+    const userInquiries = await inquiries
+      .find({ userId })
+      .sort({ createdAt: -1 })
+      .limit(50)
+      .toArray();
+    
+    const formattedInquiries = userInquiries.map((inquiry: any) => ({
+      id: String(inquiry._id),
+      category: inquiry.category,
+      title: inquiry.title,
+      content: inquiry.content,
+      status: inquiry.status,
+      date: inquiry.createdAt.toISOString().split('T')[0],
+      answer: inquiry.answer || null,
+      createdAt: inquiry.createdAt,
+      answeredAt: inquiry.answeredAt
+    }));
+    
+    return res.json({
+      ok: true,
+      inquiries: formattedInquiries
+    });
+  } catch (e) {
+    console.error('문의 내역 조회 실패:', e);
+    return res.status(500).json({ message: '서버 오류가 발생했습니다.' });
+  }
+});
+
+// GET /api/support/inquiry/:id - 특정 문의 상세 조회
+app.get('/api/support/inquiry/:id', authMiddleware, async (req: any, res) => {
+  try {
+    const client = await getClient();
+    const db = client.db(DB_NAME);
+    const inquiries = db.collection('support_inquiries');
+    
+    const userId = req.user.sub;
+    const inquiryId = req.params.id;
+    
+    if (!ObjectId.isValid(inquiryId)) {
+      return res.status(400).json({ message: '유효하지 않은 문의 ID입니다.' });
+    }
+    
+    const inquiry = await inquiries.findOne({
+      _id: new ObjectId(inquiryId),
+      userId
+    });
+    
+    if (!inquiry) {
+      return res.status(404).json({ message: '문의를 찾을 수 없습니다.' });
+    }
+    
+    return res.json({
+      ok: true,
+      inquiry: {
+        id: String(inquiry._id),
+        category: inquiry.category,
+        title: inquiry.title,
+        content: inquiry.content,
+        status: inquiry.status,
+        date: inquiry.createdAt.toISOString().split('T')[0],
+        answer: inquiry.answer || null,
+        createdAt: inquiry.createdAt,
+        answeredAt: inquiry.answeredAt
+      }
+    });
+  } catch (e) {
+    console.error('문의 조회 실패:', e);
+    return res.status(500).json({ message: '서버 오류가 발생했습니다.' });
+  }
 });
 
 // ==================== 프로필 API ====================

@@ -1,7 +1,8 @@
 // Support.tsx
 // 고객센터 페이지
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useAuth } from '../hooks/useAuth';
 
 export default function Support() {
   const [activeTab, setActiveTab] = useState<'inquiry' | 'history'>('inquiry');
@@ -254,15 +255,27 @@ function ContactCard({ icon, title, content }: { icon: string; title: string; co
 
 // 1:1 문의 폼 컴포넌트
 function InquiryForm() {
+  const { user } = useAuth();
   const [formData, setFormData] = useState({
-    name: '',
-    email: '',
+    name: user?.nickname || '',
+    email: user?.email || '',
     category: '일반문의',
     title: '',
     content: ''
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitMessage, setSubmitMessage] = useState('');
+
+  // 사용자 정보가 로드되면 폼 데이터 업데이트
+  useEffect(() => {
+    if (user) {
+      setFormData(prev => ({
+        ...prev,
+        name: user.nickname || prev.name,
+        email: user.email || prev.email
+      }));
+    }
+  }, [user]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -274,20 +287,32 @@ function InquiryForm() {
     setIsSubmitting(true);
     setSubmitMessage('');
 
-    // 여기에 실제 API 호출 로직을 추가할 수 있습니다
     try {
-      // 임시로 2초 대기 (실제로는 API 호출)
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      setSubmitMessage('문의가 성공적으로 접수되었습니다. 빠른 시일 내에 답변 드리겠습니다.');
-      setFormData({
-        name: '',
-        email: '',
-        category: '일반문의',
-        title: '',
-        content: ''
+      const response = await fetch('/api/support/inquiry', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify(formData)
       });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setSubmitMessage('문의가 성공적으로 접수되었습니다. 빠른 시일 내에 답변 드리겠습니다.');
+        setFormData({
+          name: user?.nickname || '',
+          email: user?.email || '',
+          category: '일반문의',
+          title: '',
+          content: ''
+        });
+      } else {
+        setSubmitMessage(data.message || '문의 접수 중 오류가 발생했습니다. 다시 시도해 주세요.');
+      }
     } catch (error) {
+      console.error('문의 접수 오류:', error);
       setSubmitMessage('문의 접수 중 오류가 발생했습니다. 다시 시도해 주세요.');
     } finally {
       setIsSubmitting(false);
@@ -496,10 +521,33 @@ interface Inquiry {
 
 // 문의 내역 컴포넌트
 function InquiryHistory() {
-  // 나중에 API로 실제 데이터 가져오기
-  const [inquiries] = useState<Inquiry[]>([]);
-
+  const [inquiries, setInquiries] = useState<Inquiry[]>([]);
   const [selectedInquiry, setSelectedInquiry] = useState<number | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  // 문의 내역 가져오기
+  useEffect(() => {
+    const fetchInquiries = async () => {
+      try {
+        const response = await fetch('/api/support/inquiries', {
+          credentials: 'include'
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          setInquiries(data.inquiries);
+        } else {
+          console.error('문의 내역 조회 실패');
+        }
+      } catch (error) {
+        console.error('문의 내역 조회 오류:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchInquiries();
+  }, []);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -508,6 +556,22 @@ function InquiryHistory() {
       default: return { bg: '#e5e7eb', color: '#374151', text: '확인중' };
     }
   };
+
+  if (loading) {
+    return (
+      <div style={{
+        textAlign: 'center',
+        padding: '80px 20px',
+        background: '#f9fafb',
+        borderRadius: 16
+      }}>
+        <div style={{ fontSize: 48, marginBottom: 16 }}>⏳</div>
+        <h3 style={{ fontSize: 20, fontWeight: 600, color: '#374151', marginBottom: 8 }}>
+          문의 내역을 불러오는 중...
+        </h3>
+      </div>
+    );
+  }
 
   if (inquiries.length === 0) {
     return (
@@ -537,7 +601,7 @@ function InquiryHistory() {
       }}>
         {inquiries.map((inquiry) => {
           const statusInfo = getStatusColor(inquiry.status);
-          const isExpanded = selectedInquiry === inquiry.id;
+          const isExpanded = selectedInquiry === Number(inquiry.id);
 
           return (
             <div
@@ -552,7 +616,7 @@ function InquiryHistory() {
             >
               {/* 문의 헤더 */}
               <div
-                onClick={() => setSelectedInquiry(isExpanded ? null : inquiry.id)}
+                onClick={() => setSelectedInquiry(isExpanded ? null : Number(inquiry.id))}
                 style={{
                   padding: '20px 24px',
                   cursor: 'pointer',
