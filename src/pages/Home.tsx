@@ -22,7 +22,6 @@ export default function Home() {
     return (
         <>
             <div id="homeWrap" className="home-wrap-loggedout">
-                <button className="orb-showcase-btn" onClick={() => navigate('/orb-showcase')}>✨ 3D Orb Showcase</button>
                 <div className="mainview-logout">
                     <div style={{ width: '100%', maxWidth: 540 }}>
                         <StreakWidget />

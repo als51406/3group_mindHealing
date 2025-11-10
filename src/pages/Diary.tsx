@@ -10,6 +10,7 @@ import { useToast } from '../components/Toast';
 import { ChatLoadingSkeleton, DiaryListSkeleton } from '../components/Skeleton';
 import DiaryCalendar from '../components/DiaryCalendar';
 import StreakWidget from '../components/StreakWidget';
+import { getColorName } from '../utils/colorUtils';
 import type { DiarySessionResponse, DiaryMessageResponse, DiarySessionsApiResponse, DiarySessionDetailApiResponse } from '../types/api';
 import "./Diary.css";
 
@@ -115,6 +116,35 @@ export default function Diary() {
 
     // 분석 가능 여부 계산 (useMemo)
     const canAnalyze = useMemo(() => messageCount >= MIN_REQUIRED_MESSAGES, [messageCount]);
+
+    // 주요 키워드 추출 (사용자 메시지에서 가장 많이 나온 단어)
+    const keyTopics = useMemo(() => {
+        if (messageCount < 2) return [];
+        
+        const userMessages = messages.filter(msg => msg.role === 'user').map(msg => msg.content);
+        const allText = userMessages.join(' ');
+        
+        // 한글 단어 추출 (2글자 이상)
+        const koreanWords = allText.match(/[가-힣]{2,}/g) || [];
+        
+        // 불용어 제거
+        const stopWords = ['하는', '있는', '되는', '같은', '없는', '많은', '그냥', '진짜', '정말', '너무', '정말로', '그래서', '하지만', '그런데', '그리고', '또는', '그리고', '이런', '저런', '어떤', '무슨'];
+        const filteredWords = koreanWords.filter(word => !stopWords.includes(word));
+        
+        // 빈도 계산
+        const frequency: { [key: string]: number } = {};
+        filteredWords.forEach(word => {
+            frequency[word] = (frequency[word] || 0) + 1;
+        });
+        
+        // 상위 5개 추출
+        const sorted = Object.entries(frequency)
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 5)
+            .map(([word, count]) => ({ word, count }));
+        
+        return sorted;
+    }, [messageCount, messages]);
 
     const [isAnalyzing, setIsAnalyzing] = useState(false); // 수동 분석 중
     const [showCompletedAnimation, setShowCompletedAnimation] = useState(false); // 진단 완료 애니메이션
@@ -1114,9 +1144,9 @@ export default function Diary() {
     return (
         <>
             <ToastContainer />
-            <div className="diary-layout" style={{ display: 'grid', gridTemplateColumns: '280px 1fr', gap: 0, height: 'calc(100vh - 56px)', boxSizing: 'border-box', overflow: 'hidden' }}>
+            <div className="diary-layout" style={{ display: 'grid', gridTemplateColumns: '280px 1fr', gap: 0, height: 'calc(100vh - 56px)', boxSizing: 'border-box' }}>
                 {/* 좌측: 목록 + 툴바 */}
-                <aside className="diary-sidebar" style={{ borderRight: '1px solid #e5e7eb', padding: 12, background: '#fafafa', display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden', boxSizing: 'border-box' }}>
+                <aside className="diary-sidebar" style={{ borderRight: '1px solid #e5e7eb', padding: 12, background: '#fafafa', display: 'flex', flexDirection: 'column', height: '100%', overflowY: 'auto', boxSizing: 'border-box' }}>
                     {/* 탭 전환 버튼 */}
                     <div style={{ display: 'flex', gap: 6, marginBottom: 16, background: '#fff', borderRadius: 10, padding: 4, border: '1px solid #e5e7eb', boxSizing: 'border-box' }}>
                         <button
@@ -1429,7 +1459,7 @@ export default function Diary() {
 
                     {/* 온라인 채팅 목록 */}
                     {activeTab === 'online' && (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, overflowY: 'auto', flex: 1, minHeight: 0 }}>
+                        <div className="diary-list" style={{ display: 'flex', flexDirection: 'column', gap: 6, overflowY: 'auto', flex: 1, minHeight: 0 }}>
                             {loadingList ? (
                                 <DiaryListSkeleton />
                             ) : onlineList.length === 0 ? (
@@ -1443,59 +1473,189 @@ export default function Diary() {
                                     {searchQuery || filterDate ? '검색 결과가 없습니다' : '온라인 채팅 후 저장해보세요! 🎯'}
                                 </div>
                             ) : (
-                                finalFilteredOnlineGroupedByDate.flatMap(([, items]) =>
-                                    items.map((item) => {
-                                        const active = item._id === selected;
-                                        const displayTitle = item.title || `온라인 채팅 ${new Date(item.lastUpdatedAt).toLocaleString('ko-KR')}`;
+                                finalFilteredOnlineGroupedByDate.map(([date, sessions]) => {
+                                    const isExpanded = expandedDates.has(date);
+                                    const sessionCount = sessions.length;
 
-                                        return (
-                                            <div
-                                                key={item._id}
-                                                data-session-id={item._id}
+                                    return (
+                                        <div key={date} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                                            {/* 날짜 헤더 */}
+                                            <button
+                                                onClick={() => toggleDate(date)}
                                                 style={{
-                                                    padding: '6px 8px',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'space-between',
+                                                    padding: '8px 10px',
+                                                    background: '#fff',
+                                                    color: '#374151',
+                                                    border: '1px solid #d1d5db',
                                                     borderRadius: 8,
-                                                    border: `1px solid ${active ? '#6366f1' : '#e5e7eb'}`,
-                                                    background: active ? '#eef2ff' : '#fff',
+                                                    cursor: 'pointer',
+                                                    fontSize: 13,
+                                                    fontWeight: 600,
+                                                    transition: 'all 0.2s ease',
+                                                }}
+                                                onMouseEnter={(e) => {
+                                                    e.currentTarget.style.background = '#f9fafb';
+                                                    e.currentTarget.style.borderColor = '#9ca3af';
+                                                }}
+                                                onMouseLeave={(e) => {
+                                                    e.currentTarget.style.background = '#fff';
+                                                    e.currentTarget.style.borderColor = '#d1d5db';
                                                 }}
                                             >
-                                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
-                                                    <button
-                                                        onClick={() => { setSelected(item._id); setSelectedDate(item.date); void loadSession(item._id); }}
-                                                        style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'transparent', border: 'none', padding: 0, cursor: 'pointer', flex: 1, textAlign: 'left' }}
-                                                    >
-                                                        <span style={{ fontSize: 12 }}>💬</span>
-                                                        <div style={{
-                                                            fontWeight: 600,
-                                                            fontSize: 12,
-                                                            overflow: 'hidden',
-                                                            textOverflow: 'ellipsis',
-                                                            whiteSpace: 'nowrap',
-                                                            flex: 1,
-                                                            minWidth: 0
-                                                        }}>{highlightText(displayTitle, searchQuery)}</div>
-                                                    </button>
-                                                    <button
-                                                        title="이 채팅 삭제"
-                                                        onClick={() => void deleteSession(item._id)}
-                                                        style={{ border: '1px solid #ef4444', background: '#fee2e2', color: '#991b1b', borderRadius: 6, padding: '2px 4px', cursor: 'pointer', fontSize: 10 }}
-                                                    >🗑</button>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                                    <span style={{ fontSize: 12, transition: 'transform 0.2s ease', transform: isExpanded ? 'rotate(90deg)' : 'rotate(0deg)' }}>
+                                                        ▶
+                                                    </span>
+                                                    <span style={{ fontSize: 14 }}>📁</span>
+                                                    <span style={{ fontWeight: 600, fontSize: 12, color: '#374151' }}>
+                                                        {date}
+                                                    </span>
+                                                    <span style={{ fontSize: 10, color: '#6b7280', background: '#f3f4f6', padding: '2px 6px', borderRadius: 10, border: '1px solid #e5e7eb' }}>
+                                                        {sessionCount}개
+                                                    </span>
                                                 </div>
-                                                {item.preview && (
-                                                    <div style={{
-                                                        color: '#6b7280',
-                                                        fontSize: 10,
-                                                        marginTop: 2,
-                                                        overflow: 'hidden',
-                                                        textOverflow: 'ellipsis',
-                                                        whiteSpace: 'nowrap',
-                                                        maxWidth: '100%'
-                                                    }}>{highlightText(item.preview, searchQuery)}</div>
-                                                )}
-                                            </div>
-                                        );
-                                    })
-                                )
+                                            </button>
+
+                                            {/* 세션 목록 */}
+                                            {isExpanded && (
+                                                <div style={{ display: 'flex', flexDirection: 'column', gap: 4, paddingLeft: 4 }}>
+                                                    {sessions.map((item) => {
+                                                        const active = item._id === selected;
+                                                        const displayTitle = item.title || `온라인 채팅 ${new Date(item.lastUpdatedAt).toLocaleString('ko-KR', { hour: '2-digit', minute: '2-digit' })}`;
+                                                        const isEditing = editingSessionId === item._id;
+
+                                                        return (
+                                                            <div
+                                                                key={item._id}
+                                                                data-session-id={item._id}
+                                                                style={{
+                                                                    padding: '6px 8px',
+                                                                    borderRadius: 8,
+                                                                    border: `1px solid ${active ? '#6366f1' : '#e5e7eb'}`,
+                                                                    background: active ? '#eef2ff' : '#fff',
+                                                                }}
+                                                            >
+                                                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
+                                                                    {isEditing ? (
+                                                                        <>
+                                                                            <input
+                                                                                type="text"
+                                                                                value={editingTitle}
+                                                                                onChange={(e) => setEditingTitle(e.target.value)}
+                                                                                onKeyDown={(e) => {
+                                                                                    if (e.key === 'Enter') {
+                                                                                        void saveTitle(item._id);
+                                                                                    } else if (e.key === 'Escape') {
+                                                                                        cancelEditTitle();
+                                                                                    }
+                                                                                }}
+                                                                                autoFocus
+                                                                                style={{
+                                                                                    flex: 1,
+                                                                                    padding: '4px 6px',
+                                                                                    border: '1px solid #3b82f6',
+                                                                                    borderRadius: 6,
+                                                                                    fontSize: 12,
+                                                                                    outline: 'none',
+                                                                                }}
+                                                                            />
+                                                                            <button
+                                                                                title="저장"
+                                                                                onClick={() => void saveTitle(item._id)}
+                                                                                style={{
+                                                                                    border: '1px solid #10b981',
+                                                                                    background: '#d1fae5',
+                                                                                    color: '#065f46',
+                                                                                    borderRadius: 6,
+                                                                                    padding: '2px 4px',
+                                                                                    cursor: 'pointer',
+                                                                                    fontSize: 10
+                                                                                }}
+                                                                            >
+                                                                                ✓
+                                                                            </button>
+                                                                            <button
+                                                                                title="취소"
+                                                                                onClick={cancelEditTitle}
+                                                                                style={{
+                                                                                    border: '1px solid #6b7280',
+                                                                                    background: '#f3f4f6',
+                                                                                    color: '#374151',
+                                                                                    borderRadius: 6,
+                                                                                    padding: '2px 4px',
+                                                                                    cursor: 'pointer',
+                                                                                    fontSize: 10
+                                                                                }}
+                                                                            >
+                                                                                ✕
+                                                                            </button>
+                                                                        </>
+                                                                    ) : (
+                                                                        <>
+                                                                            <button
+                                                                                onClick={() => { 
+                                                                                    setSelected(item._id); 
+                                                                                    setSelectedDate(item.date); 
+                                                                                    void loadSession(item._id); 
+                                                                                }}
+                                                                                style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'transparent', border: 'none', padding: 0, cursor: 'pointer', flex: 1, textAlign: 'left' }}
+                                                                            >
+                                                                                <span style={{ fontSize: 12 }}>💬</span>
+                                                                                <div style={{
+                                                                                    fontWeight: 600,
+                                                                                    fontSize: 12,
+                                                                                    overflow: 'hidden',
+                                                                                    textOverflow: 'ellipsis',
+                                                                                    whiteSpace: 'nowrap',
+                                                                                    flex: 1,
+                                                                                    minWidth: 0
+                                                                                }}>{highlightText(displayTitle, searchQuery)}</div>
+                                                                            </button>
+                                                                            <button
+                                                                                title="제목 수정"
+                                                                                onClick={() => startEditTitle(item._id, item.title || '')}
+                                                                                style={{
+                                                                                    border: '1px solid #3b82f6',
+                                                                                    background: '#eff6ff',
+                                                                                    color: '#1e3a8a',
+                                                                                    borderRadius: 6,
+                                                                                    padding: '2px 4px',
+                                                                                    cursor: 'pointer',
+                                                                                    fontSize: 10
+                                                                                }}
+                                                                            >
+                                                                                ✏️
+                                                                            </button>
+                                                                            <button
+                                                                                title="이 채팅 삭제"
+                                                                                onClick={() => void deleteSession(item._id)}
+                                                                                style={{ border: '1px solid #ef4444', background: '#fee2e2', color: '#991b1b', borderRadius: 6, padding: '2px 4px', cursor: 'pointer', fontSize: 10 }}
+                                                                            >🗑</button>
+                                                                        </>
+                                                                    )}
+                                                                </div>
+                                                                {!isEditing && item.preview && (
+                                                                    <div style={{
+                                                                        color: '#6b7280',
+                                                                        fontSize: 10,
+                                                                        marginTop: 2,
+                                                                        marginLeft: 20,
+                                                                        overflow: 'hidden',
+                                                                        textOverflow: 'ellipsis',
+                                                                        whiteSpace: 'nowrap',
+                                                                    }}>{highlightText(item.preview, searchQuery)}</div>
+                                                                )}
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
+                                            )}
+                                        </div>
+                                    );
+                                })
                             )}
                         </div>
                     )}
@@ -1545,27 +1705,22 @@ export default function Diary() {
                 </aside>
 
                 {/* 우측: 대화 + 배경색 */}
-                <main className="diary-main" style={{ padding: 16, boxSizing: 'border-box', display: 'flex', flexDirection: 'column',position:"relative", gap: 12 }}>
+                <main className="diary-main" style={{ padding: 16, boxSizing: 'border-box', display: 'flex', flexDirection: 'column',position:"relative", gap: 12, height: '100%', overflowY: 'auto' }}>
                     {activeTab === 'ai' ? (
                         <>
                             {/* AI 대화 탭 - 기존 UI 유지 */}
-                            <div style={{ ...bgStyle, border: '1px solid #e5e7eb', borderRadius: 12, minHeight: '70vh', padding: 12, position: 'relative', boxSizing: 'border-box', flex: 1, marginTop: 40 }}>
-                                {/* 날짜 표시 (우측 상단) */}
-                                <div style={{ position: 'absolute', top: 12, right: 12, fontSize: 18, fontWeight: 700, color: '#1f2937', textShadow: '0 1px 3px rgba(255,255,255,0.8)' }}>
-                                    {selectedDate}
-                                </div>
+                            <div style={{ ...bgStyle, border: '1px solid #e5e7eb', borderRadius: 12, padding: 12, position: 'relative', boxSizing: 'border-box', marginTop: 0 }}>
 
                                 {/* 피드백 섹션 (Feedback Section) - 오브 + 감정 진단 */}
                                 <div className="feedback-section" style={{
                                     position: 'relative',
                                     width: '100%',
-                                    padding: '20px 0',
-                                    marginBottom: 20,
+                                    paddingTop: '10px',
+                                    marginBottom: 0,
                                     display: 'flex',
                                     alignItems: 'flex-start',
                                     justifyContent: 'center',
-                                    gap: 20,
-                                    minHeight: 200
+                                    gap: 16
                                 }}>
                                     {/* SiriOrb와 말풍선 컨테이너 - 가로 배치 */}
                                     <div style={{
@@ -1573,7 +1728,7 @@ export default function Diary() {
                                         display: 'flex',
                                         flexDirection: 'row',
                                         alignItems: 'flex-start',
-                                        gap: 20,
+                                        gap: 16,
                                         flexShrink: 0,
                                         width: '100%',
                                         justifyContent: 'flex-start'
@@ -1581,16 +1736,16 @@ export default function Diary() {
                                         {/* SiriOrb - 왼쪽 */}
                                         <div style={{
                                             pointerEvents: 'none',
-                                            width: 180,
-                                            height: 180,
+                                            width: 150,
+                                            height: 150,
                                             display: 'flex',
                                             alignItems: 'center',
                                             justifyContent: 'center',
                                             flexShrink: 0
                                         }}>
                                             <div className="aurora-breathe" style={{
-                                                width: 180,
-                                                height: 180,
+                                                width: 150,
+                                                height: 150,
                                                 display: 'flex',
                                                 alignItems: 'center',
                                                 justifyContent: 'center',
@@ -1600,7 +1755,7 @@ export default function Diary() {
                                                 <WebGLErrorBoundary>
                                                     <SiriOrb
                                                         color={emotionOrbColor}
-                                                        size={180}
+                                                        size={150}
                                                         intensity={0.85}
                                                         analyzing={isWaitingAnalysis}
                                                         showCompleted={showCompletedAnimation}
@@ -1613,27 +1768,36 @@ export default function Diary() {
                                         {/* 말풍선 - 오른쪽 */}
                                         <div style={{
                                             position: 'relative',
+                                            display: 'flex',
+                                            gap: 0,
                                             flex: 1,
-                                            minWidth: 320,
-                                            maxWidth: 500,
-                                            background: 'rgba(255, 255, 255, 0.95)',
-                                            backdropFilter: 'blur(12px)',
-                                            borderRadius: 20,
-                                            padding: '20px 24px',
-                                            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.12), 0 2px 8px rgba(0, 0, 0, 0.08)',
-                                            border: '2px solid rgba(255, 255, 255, 0.8)',
-                                            animation: 'fadeInUp 0.5s ease-out'
+                                            alignItems: 'flex-start'
                                         }}>
+                                            {/* 기본 말풍선 */}
+                                            <div style={{
+                                                position: 'relative',
+                                                minWidth: 280,
+                                                maxWidth: 400,
+                                                background: 'rgba(255, 255, 255, 0.95)',
+                                                backdropFilter: 'blur(12px)',
+                                                borderRadius: 16,
+                                                padding: '14px 18px',
+                                                boxShadow: '0 6px 24px rgba(0, 0, 0, 0.1), 0 2px 6px rgba(0, 0, 0, 0.06)',
+                                                border: '2px solid rgba(255, 255, 255, 0.8)',
+                                                animation: 'fadeInUp 0.5s ease-out',
+                                                transition: 'all 0.3s ease',
+                                                flexShrink: 0
+                                            }}>
                                             {/* 말풍선 꼬리 - 왼쪽으로 */}
                                             <div style={{
                                                 position: 'absolute',
                                                 left: -10,
-                                                top: 30,
+                                                top: 25,
                                                 width: 0,
                                                 height: 0,
-                                                borderTop: '12px solid transparent',
-                                                borderBottom: '12px solid transparent',
-                                                borderRight: '12px solid rgba(255, 255, 255, 0.95)',
+                                                borderTop: '10px solid transparent',
+                                                borderBottom: '10px solid transparent',
+                                                borderRight: '10px solid rgba(255, 255, 255, 0.95)',
                                                 filter: 'drop-shadow(-2px 0 4px rgba(0, 0, 0, 0.08))'
                                             }} />
 
@@ -1641,112 +1805,127 @@ export default function Diary() {
                                             <div style={{
                                                 display: 'flex',
                                                 flexDirection: 'column',
-                                                gap: 16
+                                                gap: 12
                                             }}>
                                                 {/* 메시지 텍스트 */}
                                                 <div style={{
-                                                    fontSize: 15,
-                                                    lineHeight: 1.6,
+                                                    fontSize: 14,
+                                                    lineHeight: 1.5,
                                                     color: '#1f2937',
                                                     fontWeight: 500
                                                 }}>
                                                     {mood ? (
                                                         <>
-                                                            <span style={{ fontSize: 18, marginRight: 6 }}>✨</span>
-                                                            <strong>감정 진단이 완료되었어요!</strong>
+                                                            <span style={{ fontSize: 16, marginRight: 4 }}>✨</span>
+                                                            <strong style={{ fontSize: 14 }}>감정 진단이 완료되었어요!</strong>
                                                             <div style={{ 
-                                                                marginTop: 12,
-                                                                padding: '12px 16px',
+                                                                marginTop: 10,
+                                                                padding: '10px 12px',
                                                                 background: 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%)',
-                                                                borderRadius: 12,
+                                                                borderRadius: 10,
                                                                 border: '1px solid #bae6fd'
                                                             }}>
-                                                                <div style={{ fontSize: 14, color: '#0369a1', marginBottom: 8 }}>
-                                                                    감정: <strong style={{ fontSize: 16 }}>{mood.emotion}</strong> ({Math.round(mood.score * 100)}%)
-                                                                </div>
-                                                                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                                                    <span style={{ fontSize: 13, color: '#0369a1' }}>컬러:</span>
-                                                                    <div style={{
-                                                                        width: 24,
-                                                                        height: 24,
-                                                                        borderRadius: 6,
-                                                                        background: mood.color,
-                                                                        border: '2px solid rgba(0,0,0,0.1)',
-                                                                        boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-                                                                    }} />
-                                                                    <code style={{
-                                                                        fontSize: 12,
-                                                                        fontFamily: 'monospace',
-                                                                        color: '#0c4a6e',
-                                                                        fontWeight: 600
-                                                                    }}>
-                                                                        {mood.color}
-                                                                    </code>
+                                                                {/* 감정과 컬러 정보 */}
+                                                                <div style={{ 
+                                                                    display: 'flex', 
+                                                                    alignItems: 'center', 
+                                                                    justifyContent: 'space-between',
+                                                                    gap: 12
+                                                                }}>
+                                                                    <div style={{ fontSize: 13, color: '#0369a1' }}>
+                                                                        감정: <strong style={{ fontSize: 14 }}>{mood.emotion}</strong> ({Math.round(mood.score * 100)}%)
+                                                                    </div>
+                                                                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                                                        <span style={{ fontSize: 12, color: '#0369a1' }}>컬러:</span>
+                                                                        <div style={{
+                                                                            width: 20,
+                                                                            height: 20,
+                                                                            borderRadius: 5,
+                                                                            background: mood.color,
+                                                                            border: '2px solid rgba(0,0,0,0.1)',
+                                                                            boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                                                                        }} />
+                                                                        <span style={{
+                                                                            fontSize: 12,
+                                                                            color: '#0c4a6e',
+                                                                            fontWeight: 600
+                                                                        }}>
+                                                                            {getColorName(mood.color)}
+                                                                        </span>
+                                                                    </div>
                                                                 </div>
                                                             </div>
                                                         </>
                                                     ) : isAnalyzing ? (
                                                         <>
-                                                            <span style={{ fontSize: 18, marginRight: 6 }}>🔄</span>
-                                                            <strong>감정을 분석하고 있어요...</strong>
+                                                            <span style={{ fontSize: 16, marginRight: 4 }}>🔄</span>
+                                                            <strong style={{ fontSize: 14 }}>감정을 분석하고 있어요...</strong>
                                                         </>
                                                     ) : messageCount >= MIN_REQUIRED_MESSAGES ? (
                                                         <>
-                                                            <span style={{ fontSize: 18, marginRight: 6 }}>💬</span>
-                                                            <strong>충분한 대화가 쌓였어요!</strong>
-                                                            <div style={{ marginTop: 8, fontSize: 14, color: '#6b7280' }}>
+                                                            <span style={{ fontSize: 16, marginRight: 4 }}>💬</span>
+                                                            <strong style={{ fontSize: 14 }}>충분한 대화가 쌓였어요!</strong>
+                                                            <div style={{ marginTop: 6, fontSize: 13, color: '#6b7280' }}>
                                                                 이제 감정 진단을 받을 수 있습니다.
                                                             </div>
                                                         </>
                                                     ) : (
-                                                        <>
-                                                            <span style={{ fontSize: 18, marginRight: 6 }}>👋</span>
-                                                            <strong>안녕하세요! 당신의 감정을 분석해드려요.</strong>
-                                                            <div style={{ marginTop: 8, fontSize: 14, color: '#6b7280' }}>
-                                                                현재 대화: {messageCount}/{MIN_REQUIRED_MESSAGES}개
-                                                                {messageCount >= 2 && (
-                                                                    <span style={{ display: 'block', marginTop: 4 }}>
-                                                                        {MIN_REQUIRED_MESSAGES - messageCount}번 더 대화하면 진단할 수 있어요!
-                                                                    </span>
-                                                                )}
+                                                        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, justifyContent: 'space-between' }}>
+                                                            <div>
+                                                                <div>
+                                                                    <span style={{ fontSize: 16, marginRight: 4 }}>👋</span>
+                                                                    <strong style={{ fontSize: 14 }}>안녕하세요! 당신의 감정을 분석해드려요.</strong>
+                                                                </div>
+                                                                <div style={{ marginTop: 6, fontSize: 13, color: '#6b7280' }}>
+                                                                    현재 대화: {messageCount}/{MIN_REQUIRED_MESSAGES}개
+                                                                    {messageCount >= 2 && (
+                                                                        <span style={{ display: 'block', marginTop: 3 }}>
+                                                                            {MIN_REQUIRED_MESSAGES - messageCount}번 더 대화하면 진단할 수 있어요!
+                                                                        </span>
+                                                                    )}
+                                                                </div>
                                                             </div>
-                                                        </>
+                                                            {/* 수동 진단 버튼 */}
+                                                            {!mood && messageCount >= 2 && !isAnalyzing && (
+                                                                <button
+                                                                    onClick={manualAnalyze}
+                                                                    style={{
+                                                                        marginTop: 24,
+                                                                        padding: '10px 20px',
+                                                                        borderRadius: 10,
+                                                                        border: 'none',
+                                                                        background: messageCount >= MIN_REQUIRED_MESSAGES
+                                                                            ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
+                                                                            : 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
+                                                                        color: '#fff',
+                                                                        cursor: 'pointer',
+                                                                        fontWeight: 600,
+                                                                        fontSize: 13,
+                                                                        boxShadow: '0 3px 12px rgba(0,0,0,0.15)',
+                                                                        transition: 'all 0.2s ease',
+                                                                        whiteSpace: 'nowrap',
+                                                                        flexShrink: 0,
+                                                                        alignSelf: 'flex-start'
+                                                                    }}
+                                                                    onMouseEnter={(e) => {
+                                                                        e.currentTarget.style.transform = 'translateY(-2px)';
+                                                                        e.currentTarget.style.boxShadow = '0 5px 16px rgba(0,0,0,0.25)';
+                                                                    }}
+                                                                    onMouseLeave={(e) => {
+                                                                        e.currentTarget.style.transform = 'translateY(0)';
+                                                                        e.currentTarget.style.boxShadow = '0 3px 12px rgba(0,0,0,0.15)';
+                                                                    }}
+                                                                >
+                                                                    🧠 감정 진단하기
+                                                                </button>
+                                                            )}
+                                                        </div>
                                                     )}
                                                 </div>
 
                                                 {/* 액션 버튼들 */}
-                                                <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
-                                                    {/* 수동 진단 버튼 */}
-                                                    {!mood && messageCount >= 2 && !isAnalyzing && (
-                                                        <button
-                                                            onClick={manualAnalyze}
-                                                            style={{
-                                                                padding: '10px 20px',
-                                                                borderRadius: 10,
-                                                                border: 'none',
-                                                                background: messageCount >= MIN_REQUIRED_MESSAGES
-                                                                    ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
-                                                                    : 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
-                                                                color: '#fff',
-                                                                cursor: 'pointer',
-                                                                fontWeight: 700,
-                                                                fontSize: 14,
-                                                                boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-                                                                transition: 'all 0.2s ease',
-                                                                whiteSpace: 'nowrap'
-                                                            }}
-                                                            onMouseEnter={(e) => {
-                                                                e.currentTarget.style.transform = 'translateY(-2px)';
-                                                                e.currentTarget.style.boxShadow = '0 6px 16px rgba(0,0,0,0.2)';
-                                                            }}
-                                                            onMouseLeave={(e) => {
-                                                                e.currentTarget.style.transform = 'translateY(0)';
-                                                                e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)';
-                                                            }}
-                                                        >
-                                                            🧠 감정 진단하기
-                                                        </button>
-                                                    )}
+                                                <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                                                    {/* 매칭 제안 버튼만 여기에 */}
 
                                                     {/* 매칭 제안 버튼들 */}
                                                     {showMatchingSuggestion && mood && (
@@ -1807,8 +1986,75 @@ export default function Diary() {
                                                     )}
                                                 </div>
                                             </div>
+                                            </div>
                                         </div>
+
+                                        {/* 상세 정보 패널 (오른쪽) - 항상 표시 */}
+                                        {mood && (
+                                            <div style={{
+                                                minWidth: 260,
+                                                maxWidth: 280,
+                                                background: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)',
+                                                backdropFilter: 'blur(12px)',
+                                                borderRadius: 16,
+                                                padding: '14px 18px',
+                                                boxShadow: '0 6px 24px rgba(0, 0, 0, 0.1), 0 2px 6px rgba(0, 0, 0, 0.06)',
+                                                border: '3px solid #fbbf24',
+                                                animation: 'fadeInUp 0.5s ease-out',
+                                                flexShrink: 0,
+                                                marginLeft: -8
+                                            }}>
+                                                {/* 주요 키워드 */}
+                                                {keyTopics.length > 0 && (
+                                                    <div>
+                                                        <div style={{ fontSize: 13, color: '#92400e', marginBottom: 6, fontWeight: 700 }}>
+                                                            🔑 주요 키워드
+                                                        </div>
+                                                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                                                            {keyTopics.map((topic, idx) => (
+                                                                <span
+                                                                    key={idx}
+                                                                    style={{
+                                                                        padding: '4px 10px',
+                                                                        background: 'rgba(120, 53, 15, 0.15)',
+                                                                        borderRadius: 12,
+                                                                        fontSize: 12,
+                                                                        color: '#78350f',
+                                                                        fontWeight: 600,
+                                                                        border: '1px solid rgba(120, 53, 15, 0.25)',
+                                                                        display: 'inline-flex',
+                                                                        alignItems: 'center',
+                                                                        gap: 4
+                                                                    }}
+                                                                >
+                                                                    {topic.word}
+                                                                    <span style={{ 
+                                                                        fontSize: 10, 
+                                                                        opacity: 0.7 
+                                                                    }}>
+                                                                        ×{topic.count}
+                                                                    </span>
+                                                                </span>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
                                     </div>
+                                </div>
+
+                                {/* 날짜 표시 */}
+                                <div style={{ 
+                                    fontSize: 15, 
+                                    fontWeight: 700, 
+                                    color: '#1f2937', 
+                                    textAlign: 'right',
+                                    marginTop: 0,
+                                    marginBottom: 0,
+                                    paddingRight: 4
+                                }}>
+                                    {selectedDate}
                                 </div>
 
                                 {/* 채팅 섹션 (Chat Section) */}
@@ -1816,14 +2062,14 @@ export default function Diary() {
                                     display: 'flex', 
                                     flexDirection: 'column',
                                     gap: 12,
-                                    marginTop: 20
+                                    marginTop: 8
                                 }}>
 
                                     {/* 채팅 영역 */}
                                     <div className="diary_chat_area" style={{ position: 'relative', width: '100%' }}>
 
                                         {/* 채팅 로그 */}
-                                        <div className="diary_chat_log" style={{ border: '1px solid #e5e7eb', borderRadius: 12, height: '50vh', maxHeight: '50vh', padding: 12, overflowY: 'auto', background: 'rgba(255,255,255,0.75)', boxSizing: 'border-box', position: 'relative' }}>
+                                        <div className="diary_chat_log" style={{ border: '1px solid #e5e7eb', borderRadius: 12, height: '60vh', maxHeight: '60vh', padding: 12, overflowY: 'auto', background: 'rgba(255,255,255,0.75)', boxSizing: 'border-box', position: 'relative' }}>
 
                                             {/* 과거 날짜 경고 오버레이 */}
                                             {!isToday && (
@@ -1891,7 +2137,7 @@ export default function Diary() {
                                             {loadingDiary ? (
                                                 <ChatLoadingSkeleton />
                                             ) : (
-                                                <div style={{ paddingTop: !isToday ? '70px' : '0' }}>
+                                                <div style={{ paddingTop: !isToday ? '70px' : '0', paddingBottom: '80px' }}>
                                                     {messages.map(Bubble)}
                                                 </div>
                                             )}
