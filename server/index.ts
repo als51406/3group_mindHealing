@@ -233,19 +233,24 @@ const generalLimiter = rateLimit({
   // 특정 경로는 제외
   skip: (req) => {
     const path = req.path;
-    // 인증 확인, health check 등은 제외
+    const method = req.method;
+    // 인증 확인, health check, 자주 호출되는 조회 API는 제외
     return path === '/api/me' || 
            path === '/api/health' || 
            path === '/api/logout' ||
            path.startsWith('/api/user/emotion-stats') ||
-           path.startsWith('/api/diary/today-emotion');
+           path.startsWith('/api/diary/today-emotion') ||
+           path.startsWith('/api/goals') ||
+           path.startsWith('/api/diary') && method === 'GET' ||
+           path.startsWith('/api/support') && method === 'GET' ||
+           path.startsWith('/api/matching') && method === 'GET';
   },
 });
 
 // 로그인/회원가입 제한 (브루트포스 방지)
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15분
-  max: 5, // 최대 5회
+  max: 20, // 최대 20회 (개발 중에는 여유롭게)
   message: '너무 많은 로그인 시도입니다. 15분 후 다시 시도해주세요.',
   standardHeaders: true,
   legacyHeaders: false,

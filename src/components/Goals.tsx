@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import './Goals.css';
 
@@ -84,8 +84,25 @@ export default function Goals() {
     tags: [] as string[]
   });
 
+  const fetchTimeoutRef = useRef<number | null>(null);
+
   useEffect(() => {
-    fetchGoals();
+    // 이전 타이머가 있으면 취소
+    if (fetchTimeoutRef.current) {
+      clearTimeout(fetchTimeoutRef.current);
+    }
+    
+    // 300ms 후에 실행 (debounce)
+    fetchTimeoutRef.current = setTimeout(() => {
+      fetchGoals();
+    }, 300) as unknown as number;
+
+    // cleanup
+    return () => {
+      if (fetchTimeoutRef.current) {
+        clearTimeout(fetchTimeoutRef.current);
+      }
+    };
   }, [activeTab]);
 
   const fetchGoals = async () => {
@@ -352,7 +369,8 @@ export default function Goals() {
   }
 
   return (
-    <div className="goals-container">
+    <div className="goalsWrap">
+      <div className="goals-container">
       <div className="goals-header">
         <h2>🎯 나의 목표</h2>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -571,6 +589,7 @@ export default function Goals() {
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 }

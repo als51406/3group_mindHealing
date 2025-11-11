@@ -3,16 +3,29 @@
     padding: 0;
 }
 
-#navWrap {width: 100%; display: flex; justify-content: center; align-items: center;}
+#navWrap {
+    width: 100%; 
+    display: flex; 
+    justify-content: center; 
+    align-items: center;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 100;
+    background-color: inherit;
+}
 
 nav {
     height: 60px;
     width: 100%;
+    max-width: 100%;
     display: flex;
     justify-content: space-between;
     align-items: center;
     z-index: 11;
-    padding: 0px 5vw;
+    padding: 0px 40px;
+    box-sizing: border-box;
 }
 
 nav.main {
@@ -29,6 +42,7 @@ nav:not(.main) {
     gap: 1rem;
     z-index: 12;
     flex: 0 0 auto;
+    min-width: 100px;
 }
 
 .nav-right {
@@ -37,7 +51,9 @@ nav:not(.main) {
     gap: 0.2rem;
     justify-content: flex-end;
     min-width: 130px;
+    max-width: 300px;
     flex-shrink: 0;
+    
 }
 
 
@@ -59,10 +75,10 @@ nav:not(.main) {
     display: flex;
     height: 100%;
     align-items: center;
-    gap: 25px;
-    flex: 1;
+    gap: 15px;
+    flex: 1 1 auto;
     justify-content: center;
-    margin-right: -50px;
+    min-width: 0;
 }
 
 @media (max-width: 768px) {
@@ -80,6 +96,7 @@ nav:not(.main) {
     font-weight: 600;
     transition: background-color 0.2s ease;
     box-sizing: border-box;
+    white-space: nowrap;
 }
 
 /* 호버 시 작은 영역에만 배경 */
@@ -87,6 +104,7 @@ nav:not(.main) {
     padding: 6px 12px;
     border-radius: 6px;
     transition: background-color 0.2s ease;
+    white-space: nowrap;
 }
 
 .link-button:hover > span {
@@ -99,11 +117,13 @@ nav:not(.main) {
 
 
 .logout-btn { 
+    display: flex;
+    align-items: center;
     background: none;
     border: none; 
     cursor: pointer; 
-    width: 90px;
-    padding: 6px 12px;
+    width: 100px;
+    padding: 6px 10px;
     border-radius: 6px;
     transition: background-color 0.2s ease;
 }
@@ -153,8 +173,9 @@ nav:not(.main) {
     border-radius: 8px;
     text-align: end;
     white-space: nowrap;
-    overflow: visible;
-    min-width: max-content;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 150px;
 }
 
 .mobile-menu {
@@ -164,7 +185,7 @@ nav:not(.main) {
     background-color: white;
     box-shadow: 0 4px 10px rgba(0,0,0,0.1);
     width: 200px;
-    height: 100vh;
+    height: 100%;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -176,7 +197,7 @@ nav:not(.main) {
     position: fixed;
     left: 0;
     top: 0;
-    width: 100vw;
-    height: 100vh;
+    width: 100%;
+    height: 100%;
     z-index: 11
 }
