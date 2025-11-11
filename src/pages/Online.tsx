@@ -7,6 +7,7 @@ import { useDisplay } from "../contexts/DisplayContext";
 import { io, Socket } from "socket.io-client";
 import { useAuth } from '../hooks/useAuth';
 import { useToast } from '../components/Toast';
+import { useModal } from '../hooks/useModal';
 import Orb from '../components/Orb';
 import ProfileCard from '../components/ProfileCard';
 import type { UserProfile } from '../types/api';
@@ -48,6 +49,9 @@ export default function Online() {
 
   // Toast 알림
   const { showToast, ToastContainer } = useToast();
+  
+  // 커스텀 모달
+  const { showConfirm, ModalContainer } = useModal();
 
   // -------------------------------------- UI 상태 --------------------------------------
   // display: /online에서 활성화 할 페이지 - (main(초기 페이지), color, matching, matched, chat)
@@ -283,7 +287,7 @@ export default function Online() {
       return;
     }
 
-    const confirmSave = confirm('대화가 종료되었습니다.\n\n오늘의 대화를 다이어리에 기록해둘까요?');
+    const confirmSave = await showConfirm('대화가 종료되었습니다.\n\n오늘의 대화를 다이어리에 기록해둘까요?', undefined, '💾');
     if (!confirmSave) return;
 
     try {
@@ -339,7 +343,7 @@ export default function Online() {
       });
 
       // 다이어리 페이지로 이동 여부 묻기
-      const goToDiary = confirm('다이어리 페이지로 이동하시겠습니까?');
+      const goToDiary = await showConfirm('다이어리 페이지로 이동하시겠습니까?', undefined, '📖');
       if (goToDiary) {
         navigate('/diary', {
           state: {
@@ -360,13 +364,14 @@ export default function Online() {
 
   // exitChat: 채팅방 나가기
   const exitChat = async () => {
-    if (!confirm('채팅방을 나가시겠습니까?')) {
+    const confirmExit = await showConfirm('채팅방을 나가시겠습니까?', undefined, '🚪');
+    if (!confirmExit) {
       return;
     }
 
     // 메시지가 있으면 다이어리 저장 여부 묻기
     if (messagesRef.current && messagesRef.current.length > 0) {
-      const shouldSave = confirm('대화 내용을 다이어리에 저장하시겠습니까?');
+      const shouldSave = await showConfirm('대화 내용을 다이어리에 저장하시겠습니까?', undefined, '💾');
       if (shouldSave) {
         await saveToDiary();
       }
@@ -983,6 +988,7 @@ export default function Online() {
         </div>
       )}
       {/* <4> 챗온 채팅 페이지 -끝- */}
+      <ModalContainer />
     </>
   );
 }

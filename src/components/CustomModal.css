@@ -1,0 +1,159 @@
+/* CustomModal.css - 커스텀 모달 스타일 */
+
+.custom-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+  animation: fadeIn 0.2s ease-out;
+}
+
+.custom-modal-container {
+  background: white;
+  border-radius: 20px;
+  padding: 40px 32px 32px 32px;
+  min-width: 320px;
+  max-width: 480px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  animation: slideUp 0.3s ease-out;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+.custom-modal-icon {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #a8daff 0%, #7ab8e8 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 42px;
+  color: white;
+  box-shadow: 0 4px 16px rgba(122, 184, 232, 0.4);
+  margin-bottom: 8px;
+}
+
+.custom-modal-title {
+  font-size: 20px;
+  font-weight: 700;
+  color: #1f2937;
+  text-align: center;
+  line-height: 1.4;
+}
+
+.custom-modal-message {
+  font-size: 16px;
+  font-weight: 500;
+  color: #374151;
+  text-align: center;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  max-width: 100%;
+  word-break: keep-all;
+}
+
+.custom-modal-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 16px;
+  width: 100%;
+  justify-content: center;
+}
+
+.custom-modal-btn {
+  flex: 1;
+  max-width: 160px;
+  padding: 14px 24px;
+  border-radius: 12px;
+  border: none;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.custom-modal-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.custom-modal-btn:active {
+  transform: translateY(0);
+}
+
+.custom-modal-btn.btn-confirm {
+  background: linear-gradient(135deg, #a8daff 0%, #7ab8e8 100%);
+  color: white;
+}
+
+.custom-modal-btn.btn-confirm:hover {
+  background: linear-gradient(135deg, #7ab8e8 0%, #6aacdb 100%);
+}
+
+.custom-modal-btn.btn-cancel {
+  background: linear-gradient(135deg, #e8b5ff 0%, #c896e8 100%);
+  color: white;
+}
+
+.custom-modal-btn.btn-cancel:hover {
+  background: linear-gradient(135deg, #c896e8 0%, #b886d8 100%);
+}
+
+/* 애니메이션 */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* 반응형 */
+@media (max-width: 640px) {
+  .custom-modal-container {
+    min-width: 280px;
+    padding: 32px 24px 24px 24px;
+  }
+
+  .custom-modal-icon {
+    width: 64px;
+    height: 64px;
+    font-size: 32px;
+  }
+
+  .custom-modal-title {
+    font-size: 18px;
+  }
+
+  .custom-modal-message {
+    font-size: 14px;
+  }
+
+  .custom-modal-btn {
+    padding: 12px 20px;
+    font-size: 14px;
+  }
+}

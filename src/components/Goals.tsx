@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useModal } from '../hooks/useModal';
 import './Goals.css';
 
 interface EmotionGoal {
@@ -61,6 +62,7 @@ const priorityLabels: Record<string, string> = {
 
 export default function Goals() {
   const navigate = useNavigate();
+  const { showConfirm, ModalContainer } = useModal();
   const [goals, setGoals] = useState<Goal[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -157,7 +159,8 @@ export default function Goals() {
   };
 
   const deleteGoal = async (goalId: string) => {
-    if (!confirm('이 목표를 삭제하시겠습니까?')) return;
+    const confirmed = await showConfirm('이 목표를 삭제하시겠습니까?', undefined, '🗑️');
+    if (!confirmed) return;
     
     try {
       const response = await fetch(`/api/goals/${goalId}`, {
@@ -174,7 +177,8 @@ export default function Goals() {
   };
 
   const cancelGoal = async (goalId: string) => {
-    if (!confirm('이 목표를 취소하시겠습니까?')) return;
+    const confirmed = await showConfirm('이 목표를 취소하시겠습니까?', undefined, '⚠️');
+    if (!confirmed) return;
     
     try {
       const response = await fetch(`/api/goals/${goalId}`, {
@@ -589,6 +593,7 @@ export default function Goals() {
           </div>
         </div>
       )}
+      <ModalContainer />
       </div>
     </div>
   );

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../hooks/useAuth';
+import { useModal } from '../hooks/useModal';
 import ProfileCard from '../components/ProfileCard';
 import { InlineSpinner } from '../components/LoadingSpinner';
 import type { UserProfile } from '../types/api';
@@ -7,6 +8,7 @@ import './Profile.css';
 
 const Profile: React.FC = () => {
   const { user } = useAuth();
+  const { showAlert, ModalContainer } = useModal();
   
   const [profile, setProfile] = useState<UserProfile>({
     id: user?.id || '',
@@ -119,7 +121,7 @@ const Profile: React.FC = () => {
     
     // 닉네임 8글자 제한
     if (profile.nickname.length > 8) {
-      alert('닉네임은 최대 8글자까지 입력 가능합니다.');
+      await showAlert('닉네임은 최대 8글자까지 입력 가능합니다.', undefined, '⚠️');
       return;
     }
     
@@ -188,10 +190,10 @@ const Profile: React.FC = () => {
         }
       }
       
-      alert('프로필이 저장되었습니다!');
+      await showAlert('프로필이 저장되었습니다!', undefined, '✓');
     } catch (error) {
       console.error('Save profile error:', error);
-      alert('프로필 저장에 실패했습니다.');
+      await showAlert('프로필 저장에 실패했습니다.', undefined, '✕');
     } finally {
       setIsSaving(false);
     }
@@ -200,12 +202,12 @@ const Profile: React.FC = () => {
   // 비밀번호 변경
   const handlePasswordChange = async () => {
     if (!currentPassword || !newPassword || !confirmPassword) {
-      alert('모든 필드를 입력해주세요.');
+      await showAlert('모든 필드를 입력해주세요.', undefined, '⚠️');
       return;
     }
 
     if (newPassword !== confirmPassword) {
-      alert('새 비밀번호가 일치하지 않습니다.');
+      await showAlert('새 비밀번호가 일치하지 않습니다.', undefined, '✕');
       return;
     }
 
@@ -226,13 +228,13 @@ const Profile: React.FC = () => {
         throw new Error(data.message || 'Failed to change password');
       }
 
-      alert('비밀번호가 변경되었습니다!');
+      await showAlert('비밀번호가 변경되었습니다!', undefined, '✓');
       setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
     } catch (error: any) {
       console.error('Change password error:', error);
-      alert(error.message || '비밀번호 변경에 실패했습니다.');
+      await showAlert(error.message || '비밀번호 변경에 실패했습니다.', undefined, '✕');
     } finally {
       setChangingPassword(false);
     }
@@ -449,9 +451,9 @@ const Profile: React.FC = () => {
 
         {/* 온보딩 다시 보기 버튼 */}
         <button
-          onClick={() => {
+          onClick={async () => {
             localStorage.removeItem('onboarding_completed');
-            alert('페이지를 새로고침하면 온보딩 가이드가 다시 표시됩니다. 🎉');
+            await showAlert('페이지를 새로고침하면 온보딩 가이드가 다시 표시됩니다. 🎉', undefined, '🎓');
             window.location.reload();
           }}
           style={{
@@ -479,6 +481,8 @@ const Profile: React.FC = () => {
           🎓 온보딩 가이드 다시 보기
         </button>
       </div>
+
+      <ModalContainer />
     </div>
   );
 };

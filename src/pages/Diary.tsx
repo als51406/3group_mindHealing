@@ -4,6 +4,7 @@ import type { ReactNode } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useDisplay } from "../contexts/DisplayContext";
 import { useAuth } from '../hooks/useAuth';
+import { useModal } from '../hooks/useModal';
 import SiriOrb from '../components/SiriOrb';
 import ColorCircle from '../components/ColorCircle';
 import { useToast } from '../components/Toast';
@@ -97,6 +98,7 @@ export default function Diary() {
     const location = useLocation();
     const { user, loading } = useAuth();
     const { showToast, ToastContainer } = useToast();
+    const { showConfirm, ModalContainer } = useModal();
 
     // 탭 관리: 'ai' (AI 대화) 또는 'online' (온라인 채팅)
     const [activeTab, setActiveTab] = useState<'ai' | 'online'>('ai');
@@ -986,7 +988,8 @@ export default function Diary() {
 
     const deleteSession = async (id: string) => {
         if (!id) return;
-        if (!confirm('이 대화 전체를 삭제할까요? 되돌릴 수 없습니다.')) return;
+        const confirmed = await showConfirm('이 대화 전체를 삭제할까요?\n되돌릴 수 없습니다.', undefined, '🗑️');
+        if (!confirmed) return;
         try {
             const res = await fetch(`/api/diary/session/${id}`, { method: 'DELETE', credentials: 'include' });
             if (res.ok) {
@@ -2399,6 +2402,7 @@ export default function Diary() {
                     onClose={() => setShowMatchingSuggestion(false)}
                 />
             )}
+            <ModalContainer />
         </>
     );
 }

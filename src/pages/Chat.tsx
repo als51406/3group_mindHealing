@@ -4,6 +4,7 @@ import { useNavigate, useLocation } from "react-router-dom"; // 페이지 이동
 import { useDisplay } from "../contexts/DisplayContext";
 import { useAuth } from "../hooks/useAuth"; // 로그인 상태 관리용 커스텀 훅
 import { useToast } from "../components/Toast"; // Toast 알림 시스템
+import { useModal } from "../hooks/useModal"; // 커스텀 모달
 import "./Chat.css";
 
 // AiMsg 타입 정의: 한 줄의 메시지를 나타냄
@@ -31,6 +32,7 @@ const Chat: React.FC = () => {
     useEffect(() => { userRef.current = user; }, [user]);
 
     const { showToast, ToastContainer } = useToast(); // Toast 알림
+    const { showConfirm, ModalContainer } = useModal(); // 커스텀 모달
     const [msgs, setMsgs] = useState<AiMsg[]>([
         // 초기 메시지(첫 인사)
         { role: 'assistant', content: '안녕하세요! 무엇을 도와드릴까요?' },
@@ -520,7 +522,7 @@ const Chat: React.FC = () => {
             return;
         }
 
-        const confirmSave = confirm('현재 대화를 다이어리에 저장하시겠습니까?');
+        const confirmSave = await showConfirm('현재 대화를 다이어리에 저장하시겠습니까?', undefined, '💾');
         if (!confirmSave) return;
 
         setSavingToDiary(true);
@@ -566,7 +568,7 @@ const Chat: React.FC = () => {
                 duration: 3500
             });
 
-            const goToDiary = confirm('다이어리 페이지로 이동하시겠습니까?');
+            const goToDiary = await showConfirm('다이어리 페이지로 이동하시겠습니까?', undefined, '📖');
             if (goToDiary) {
                 navigate('/diary');
             }
@@ -1017,6 +1019,7 @@ const Chat: React.FC = () => {
                     </button>
                 </form>
             </div>
+            <ModalContainer />
         </>
     );
 }
