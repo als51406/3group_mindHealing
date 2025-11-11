@@ -22,20 +22,20 @@ export default function Online() {
     if (import.meta.env.VITE_SOCKET_SERVER_URL && import.meta.env.VITE_SOCKET_SERVER_URL !== '') {
       return import.meta.env.VITE_SOCKET_SERVER_URL;
     }
-    
+
     // 현재 호스트 기반 자동 감지
     const currentHost = window.location.hostname;
     const protocol = window.location.protocol; // http: or https:
-    
+
     // localhost나 127.0.0.1인 경우
     if (currentHost === 'localhost' || currentHost === '127.0.0.1') {
       return `${protocol}//localhost:7780`;
     }
-    
+
     // 네트워크 IP로 접속한 경우 (같은 IP의 7780 포트로 연결)
     return `${protocol}//${currentHost}:7780`;
   };
-  
+
   const serverLink = getServerUrl();
   console.log('🌐 Socket.IO 서버 연결 주소:', serverLink);
   console.log('📍 현재 페이지 주소:', window.location.href);
@@ -76,7 +76,7 @@ export default function Online() {
   // -------------------------------------- 프로필 상태 --------------------------------------
   // myProfile: 내 프로필 정보
   const [myProfile, setMyProfile] = useState<UserProfile | null>(null);
-  
+
   // partnerProfile: 상대방 프로필 정보
   const [partnerProfile, setPartnerProfile] = useState<UserProfile | null>(null);
 
@@ -107,7 +107,7 @@ export default function Online() {
   useEffect(() => {
     const loadMyProfile = async () => {
       if (!user) return;
-      
+
       try {
         // 기본 프로필 정보
         const res = await fetch('/api/me', { credentials: 'include' });
@@ -119,7 +119,7 @@ export default function Online() {
             const titleRes = await fetch('/api/user/emotion-title', {
               credentials: 'include'
             });
-            
+
             let emotionData = null;
             if (titleRes.ok) {
               const titleData = await titleRes.json();
@@ -131,12 +131,12 @@ export default function Online() {
                 };
               }
             }
-            
+
             // 감정 TOP3 로드
             const statsRes = await fetch('/api/user/emotion-stats', {
               credentials: 'include'
             });
-            
+
             let topEmotions = [];
             if (statsRes.ok) {
               const statsData = await statsRes.json();
@@ -144,7 +144,7 @@ export default function Online() {
                 topEmotions = statsData.topEmotions.slice(0, 3);
               }
             }
-            
+
             // 칭호 로드
             const cached = localStorage.getItem('emotion_title_cache');
             let title = '';
@@ -156,7 +156,7 @@ export default function Online() {
                 // ignore
               }
             }
-            
+
             setMyProfile({
               id: data.user._id || data.user.id,
               nickname: data.user.nickname || 'User',
@@ -165,7 +165,7 @@ export default function Online() {
               todayEmotion: emotionData || undefined,
               topEmotions: topEmotions,
             });
-            
+
             console.log('✅ 내 프로필 로드 완료:', {
               nickname: data.user.nickname,
               title: title,
@@ -177,7 +177,7 @@ export default function Online() {
         console.error('내 프로필 로드 실패:', error);
       }
     };
-    
+
     loadMyProfile();
   }, [user]);
 
@@ -399,7 +399,7 @@ export default function Online() {
   useEffect(() => {
     // user가 로드되지 않았으면 연결하지 않음
     if (!user) return;
-    
+
     // 서버 주소에 맞게 포트 확인 (백엔드에서 httpServer.listen(PORT)와 동일해야 함)
     // Chrome Private Network Access 경고: localhost HTTP 연결 시 발생하는 경고입니다.
     // 개발 환경에서는 정상 동작하며, 프로덕션에서는 HTTPS 사용을 권장합니다.
@@ -416,30 +416,30 @@ export default function Online() {
         email: user.email || ''
       }
     });
-    
+
     socket.current = client;
 
     // 서버 -> 클라이언트 (connect)
     client.on("connect", () => {
       console.log(`✅ 서버에 연결되었습니다: ${client.id}, 이메일: ${user.email}`);
     });
-    
+
     // 연결 오류 처리
     client.on("connect_error", (error) => {
       console.error("❌ 서버 연결 실패:", error.message);
     });
-    
+
     // 재연결 시도
     client.on("reconnect_attempt", (attempt) => {
       console.log(`서버 재연결 시도 중... (${attempt}회)`);
     });
-    
+
     // 재연결 실패
     client.on("reconnect_failed", () => {
       console.error("서버 재연결 실패. 페이지를 새로고침해주세요.");
       showToast({ message: '서버 연결에 실패했습니다. 페이지를 새로고침해주세요.', type: 'error' });
     });
-    
+
     // 연결 해제
     client.on("disconnect", (reason) => {
       console.log("서버 연결 해제:", reason);
@@ -464,14 +464,14 @@ export default function Online() {
 
       // 서버에서 받은 방 ID 저장
       setRoomId(data.roomId);
-      
+
       // 상대방의 전체 프로필 정보 로드
       try {
         // 서버에서 받은 기본 프로필 정보
         const partnerEmotionStats = data.partnerEmotionStats || [];
-        
+
         console.log('🔍 감정 통계 처리:', partnerEmotionStats);
-        
+
         // 상대방의 상세 프로필 설정
         const profileData = {
           id: data.partnerId || 'partner',
@@ -490,10 +490,10 @@ export default function Online() {
             color: stat.color || '#a78bfa'
           })),
         };
-        
+
         console.log('✅ 설정할 프로필 데이터:', profileData);
         setPartnerProfile(profileData);
-        
+
         console.log('상대방 프로필 로드 완료:', {
           nickname: data.partnerNickname,
           title: data.partnerTitle,
@@ -746,20 +746,20 @@ export default function Online() {
 
             {/* 프로필 카드들 */}
             <div style={{
-              display: 'flex', 
-              flexDirection: 'row', 
-              justifyContent: 'center', 
-              alignItems: 'flex-start', 
-              gap: 20, 
+              display: 'flex',
+              flexDirection: 'row',
+              justifyContent: 'center',
+              alignItems: 'flex-start',
+              gap: 20,
               maxWidth: '100%',
               width: '100%',
               padding: '0 16px'
             }}>
               {/* 상대방 프로필 */}
               {partnerProfile && (
-                <div style={{ 
-                  display: 'flex', 
-                  flexDirection: 'column', 
+                <div style={{
+                  display: 'flex',
+                  flexDirection: 'column',
                   alignItems: 'center',
                   flex: '1 1 0',
                   minWidth: 0,
@@ -774,9 +774,9 @@ export default function Online() {
 
               {/* 내 프로필 */}
               {myProfile && (
-                <div style={{ 
-                  display: 'flex', 
-                  flexDirection: 'column', 
+                <div style={{
+                  display: 'flex',
+                  flexDirection: 'column',
                   alignItems: 'center',
                   flex: '1 1 0',
                   minWidth: 0,
@@ -796,24 +796,14 @@ export default function Online() {
 
       {/* <4> 챗온 채팅 페이지 -시작- */}
       {display == "chat" && (
-        <div style={{ width: '100%', maxWidth: 1400, margin: '0 auto', padding: '24px 16px' }}>
+        <div style={{ width: '100vw'}}>
 
-          {/* 메인 컨테이너: 프로필 - 채팅 - 프로필 */}
-          <div style={{
-            display: 'flex',
-            justifyContent: 'center',
-            alignItems: 'flex-start',
-            gap: 20,
-            flexWrap: 'wrap',
-          }}>
+          {/* 상대방 프로필 + 내 프로필 */}
+          <div className="profile-cards">
             {/* 왼쪽: 상대방 프로필 */}
-            <div style={{ 
+            <div className="profile-card-partner" style={{
               flex: '0 0 auto',
-              width: '100%',
-              maxWidth: '300px',
-              minWidth: '250px',
-              height: 'calc(100vh - 200px)',
-              minHeight: '400px',
+              width: '300px',
               display: 'flex',
               flexDirection: 'column',
             }}>
@@ -825,22 +815,47 @@ export default function Online() {
               )}
             </div>
 
+            {/* 오른쪽: 내 프로필 */}
+            <div className="profile-card-my" style={{
+              flex: '0 0 auto',
+              width: '300px',
+              display: 'flex',
+              flexDirection: 'column',
+            }}>
+              {myProfile && (
+                <>
+                  <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 8, color: '#6B7280', textAlign: 'right' }}>나</div>
+                  <ProfileCard profile={myProfile} compact />
+                </>
+              )}
+            </div>
+          </div>
+
+          {/* 메인 컨테이너: 채팅 */}
+          <div style={{
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'flex-start',
+            gap: 20,
+            flexWrap: 'wrap',
+          }}>
+
             {/* 중앙: 채팅 영역 */}
-            <div style={{ 
+            <div style={{
               flex: '1 1 600px',
-              minWidth: 0,
+              width: '30vw',
               maxWidth: '700px',
               display: 'flex',
               flexDirection: 'column',
             }}>
               {/* 채팅 제목과 나가기 버튼 */}
-              <div style={{ position: 'relative', marginBottom: 16 }}>
+              <div style={{ position: 'relative', margin: 16 }}>
                 <h2 style={{ textAlign: 'center', margin: 0 }}>온라인 채팅</h2>
                 <button
                   onClick={exitChat}
                   style={{
                     position: 'absolute',
-                    right: 0,
+                    right: 10,
                     top: '50%',
                     transform: 'translateY(-50%)',
                     padding: '6px 12px',
@@ -857,9 +872,9 @@ export default function Online() {
               </div>
 
               {/* 안내 문구 */}
-              <div style={{ 
-                fontSize: 12, 
-                color: '#6B7280', 
+              <div style={{
+                fontSize: 12,
+                color: '#6B7280',
                 marginBottom: 12,
                 textAlign: 'center'
               }}>
@@ -867,130 +882,103 @@ export default function Online() {
               </div>
 
               {/* 채팅창 */}
-              <div
-                style={{
-                  padding: 16,
-                  display: 'grid',
-                  gridTemplateRows: '1fr auto',
-                  gap: 12,
-                  height: 'calc(100vh - 200px)',
-                  minHeight: '400px',
-                }}
-              >
-            {/* 💬 메시지 목록 영역 */}
-            <div
-              style={{
-                border: '1px solid rgba(255, 255, 255, 0.3)',
-                borderRadius: 16,
-                padding: 12,
-                overflowY: 'auto',
-                background: 'rgba(255, 255, 255, 0.75)',
-                backdropFilter: 'blur(20px)',
-                boxShadow: '0 8px 32px rgba(0, 0, 0, 0.1)',
-              }}
-            >
-              {messages.map((map, i) => {
+              <div className="chat-area">
+                {/* 💬 메시지 목록 영역 */}
+                <div
+                  style={{
+                    border: '1px solid rgba(255, 255, 255, 0.3)',
+                    borderRadius: 16,
+                    padding: 12,
+                    overflowY: 'auto',
+                    background: 'rgba(255, 255, 255, 0.75)',
+                    backdropFilter: 'blur(20px)',
+                    boxShadow: '0 8px 32px rgba(0, 0, 0, 0.1)',
+                  }}
+                >
+                  {messages.map((map, i) => {
 
-                // 내 메시지인지 확인
-                const isMine = map.user === userRef.current?.email;
-                console.log(map.user, userRef.current?.email, isMine);
+                    // 내 메시지인지 확인
+                    const isMine = map.user === userRef.current?.email;
+                    console.log(map.user, userRef.current?.email, isMine);
 
-                return (
-                  <div key={i} style={{ display: 'flex', justifyContent: isMine ? 'flex-end' : 'flex-start', marginBottom: 8 }}>
-                    <div style={{
-                      maxWidth: '70%',
-                      border: '2px solid',
-                      borderColor: map.color,
-                      borderRadius: isMine ? '40px 10px 35px 40px' : '10px 40px 40px 35px',
-                      padding: '14px 20px',
-                      fontSize: '14px',
-                      whiteSpace: 'pre-wrap',
-                      wordBreak: 'break-word',
-                      background: isMine ? 'rgba(255, 255, 255, 0.95)' : 'rgba(249, 250, 251, 0.95)',
+                    return (
+                      <div key={i} style={{ display: 'flex', justifyContent: isMine ? 'flex-end' : 'flex-start', marginBottom: 8 }}>
+                        <div style={{
+                          maxWidth: '70%',
+                          border: '2px solid',
+                          borderColor: map.color,
+                          borderRadius: isMine ? '40px 10px 35px 40px' : '10px 40px 40px 35px',
+                          padding: '14px 20px',
+                          fontSize: '14px',
+                          whiteSpace: 'pre-wrap',
+                          wordBreak: 'break-word',
+                          background: isMine ? 'rgba(255, 255, 255, 0.95)' : 'rgba(249, 250, 251, 0.95)',
+                          backdropFilter: 'blur(10px)',
+                          boxShadow: isMine ? '0 4px 12px rgba(102, 126, 234, 0.2)' : '0 2px 8px rgba(0, 0, 0, 0.1)',
+                        }}>
+                          {map.text} {/* 메시지 내용 */}
+                        </div>
+                      </div>
+                    );
+                  })}
+
+                  {/* 👇 스크롤 이동용 더미 div */}
+                  <div ref={bottomRef} />
+
+                </div>
+
+                {/* ✏️ 입력창 + 전송 버튼 */}
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    void send();
+                  }}
+                  style={{ display: 'flex', alignItems: 'flex-end', gap: 8 }}
+                >
+                  <textarea
+                    value={input}
+                    onChange={(event) => setInput(event.target.value)}
+                    onKeyDown={onKeyDown}
+                    placeholder="메시지를 입력하세요. Enter 전송 (Shift+Enter 줄바꿈)"
+                    rows={2}
+                    style={{
+                      flex: 1,
+                      padding: 12,
+                      border: '1px solid rgba(229, 231, 235, 0.5)',
+                      borderRadius: 12,
+                      resize: 'vertical',
+                      background: 'rgba(255, 255, 255, 0.9)',
                       backdropFilter: 'blur(10px)',
-                      boxShadow: isMine ? '0 4px 12px rgba(102, 126, 234, 0.2)' : '0 2px 8px rgba(0, 0, 0, 0.1)',
-                    }}>
-                      {map.text} {/* 메시지 내용 */}
-                    </div>
-                  </div>
-                );
-              })}
-
-              {/* 👇 스크롤 이동용 더미 div */}
-              <div ref={bottomRef} />
-
+                      boxShadow: '0 2px 8px rgba(0, 0, 0, 0.05)',
+                      outline: 'none',
+                      transition: 'all 0.3s ease',
+                    }}
+                  />
+                  <button
+                    type="submit"
+                    disabled={!input.trim()}
+                    style={{
+                      padding: '10px 20px',
+                      borderRadius: 12,
+                      border: 'none',
+                      background: !input.trim() ? 'rgba(147, 197, 253, 0.8)' : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                      color: '#fff',
+                      cursor: !input.trim() ? 'not-allowed' : 'pointer',
+                      fontWeight: 600,
+                      boxShadow: !input.trim() ? 'none' : '0 4px 12px rgba(102, 126, 234, 0.4)',
+                      transition: 'all 0.3s ease',
+                      transform: !input.trim() ? 'scale(0.95)' : 'scale(1)',
+                    }}
+                  >
+                    전송
+                  </button>
+                </form>
+              </div>
+              {/* 채팅 영역 끝 */}
             </div>
 
-            {/* ✏️ 입력창 + 전송 버튼 */}
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                void send();
-              }}
-              style={{ display: 'flex', alignItems: 'flex-end', gap: 8 }}
-            >
-              <textarea
-                value={input}
-                onChange={(event) => setInput(event.target.value)}
-                onKeyDown={onKeyDown}
-                placeholder="메시지를 입력하세요. Enter 전송 (Shift+Enter 줄바꿈)"
-                rows={2}
-                style={{
-                  flex: 1,
-                  padding: 12,
-                  border: '1px solid rgba(229, 231, 235, 0.5)',
-                  borderRadius: 12,
-                  resize: 'vertical',
-                  background: 'rgba(255, 255, 255, 0.9)',
-                  backdropFilter: 'blur(10px)',
-                  boxShadow: '0 2px 8px rgba(0, 0, 0, 0.05)',
-                  outline: 'none',
-                  transition: 'all 0.3s ease',
-                }}
-              />
-              <button
-                type="submit"
-                disabled={!input.trim()}
-                style={{
-                  padding: '10px 20px',
-                  borderRadius: 12,
-                  border: 'none',
-                  background: !input.trim() ? 'rgba(147, 197, 253, 0.8)' : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                  color: '#fff',
-                  cursor: !input.trim() ? 'not-allowed' : 'pointer',
-                  fontWeight: 600,
-                  boxShadow: !input.trim() ? 'none' : '0 4px 12px rgba(102, 126, 234, 0.4)',
-                  transition: 'all 0.3s ease',
-                  transform: !input.trim() ? 'scale(0.95)' : 'scale(1)',
-                }}
-              >
-                전송
-              </button>
-            </form>
           </div>
-          {/* 채팅 영역 끝 */}
-        </div>
-
-        {/* 오른쪽: 내 프로필 */}
-        <div style={{ 
-          flex: '0 0 auto',
-          width: '100%',
-          maxWidth: '300px',
-          minWidth: '250px',
-          height: 'calc(100vh - 200px)',
-          minHeight: '400px',
-          display: 'flex',
-          flexDirection: 'column',
-        }}>
-          {myProfile && (
-            <>
-              <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 8, color: '#6B7280', textAlign: 'right' }}>나</div>
-              <ProfileCard profile={myProfile} compact />
-            </>
-          )}
-        </div>
-      </div>
-      {/* 메인 컨테이너 끝 */}
+          {/* 메인 컨테이너 끝 */}
 
         </div>
       )}
