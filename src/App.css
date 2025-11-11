@@ -18,9 +18,6 @@ body:not([data-chat-bg]) {
 }
 
 /* 네비게이션이 fixed이므로 컨텐츠에 상단 여백 추가 */
-body {
-	padding-top: 60px;
-}
 
 html {
 	overflow-y: scroll;
