@@ -1706,7 +1706,7 @@ export default function Diary() {
                 </aside>
 
                 {/* 우측: 대화 + 배경색 */}
-                <main className="diary-main" style={{ padding: 16, boxSizing: 'border-box', display: 'flex', flexDirection: 'column',position:"relative", gap: 12, height: '100%', overflowY: 'auto' }}>
+                <main className="diary-main" style={{ padding: 16, boxSizing: 'border-box', display: 'flex', flexDirection: 'column',position:"relative", gap: 12, height: '100%', overflow: 'hidden' }}>
                     {activeTab === 'ai' ? (
                         <>
                             {/* AI 대화 탭 - 기존 UI 유지 */}
