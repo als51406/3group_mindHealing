@@ -30,7 +30,6 @@
 nav {
     height: 60px;
     width: 100%;
-   
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -38,6 +37,7 @@ nav {
     padding: 0px 60px;
     box-sizing: border-box;
     background-color: white;
+    position: relative; /* for absolute centering of .nav-center */
 }
 
 h1 p {font-family:"mk" !important}
@@ -72,12 +72,28 @@ nav:not(.main) {
 }
 
 .nav-center {
-    width: 40vw;
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
     display: flex;
     height: 100%;
     align-items: center;
-    justify-content: space-between;
+    justify-content: center;
+    gap: 1.2rem;
+    max-width: 800px;
+    width: calc(100% - 320px); /* leave space for left/right items */
     min-width: 0;
+}
+
+/* Mobile fallback: when space is constrained, make nav-center static and inline */
+@media (max-width: 1024px) {
+    .nav-center {
+        position: static;
+        transform: none;
+        width: auto;
+        justify-content: space-between;
+    }
 }
 
 
@@ -234,7 +250,7 @@ nav:not(.main) {
     }
 }
 
-@media (max-width: 900px) {
+@media (max-width: 973px) {
     nav {
         padding: 0px 30px;
     }
