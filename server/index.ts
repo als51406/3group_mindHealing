@@ -276,7 +276,11 @@ const uploadLimiter = rateLimit({
 });
 
 // 일반 제한을 모든 API에 적용
-app.use('/api/', generalLimiter);
+if (process.env.NODE_ENV === 'production') {
+  app.use('/api/', generalLimiter);
+} else {
+  console.warn('Dev mode: general API rate limiter is disabled for faster local iteration.');
+}
 
 let cachedClient: MongoClient | null = null;
 async function getClient() {

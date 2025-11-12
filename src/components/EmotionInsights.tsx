@@ -1,6 +1,5 @@
 // EmotionInsights.tsx - 감정 패턴 분석 및 인사이트 컴포넌트
 import { useEffect, useState } from 'react';
-import fetchWithBackoff from '../utils/api';
 
 interface Insights {
   summary: string;
@@ -31,7 +30,7 @@ export default function EmotionInsights({ days = 30 }: EmotionInsightsProps) {
       setLoading(true);
       setError(null);
 
-      const res = await fetchWithBackoff(`/api/emotion/insights?days=${days}`, {
+      const res = await fetch(`/api/emotion/insights?days=${days}`, {
         credentials: 'include'
       });
 

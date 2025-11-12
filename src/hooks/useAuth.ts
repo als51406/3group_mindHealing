@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import fetchWithBackoff from '../utils/api';
+import { fetchWithBackoff } from '../utils/api';
 
 export type AuthUser = { 
   id: string; 
@@ -9,7 +9,7 @@ export type AuthUser = {
   profileImage?: string;
 };
 
-// use fetchWithBackoff helper from src/utils/api to dedupe and handle 429s
+// Using centralized fetchWithBackoff helper for API calls
 
 export function useAuth() {
   const [user, setUser] = useState<AuthUser | null>(null);
@@ -21,11 +21,9 @@ export function useAuth() {
     setError(null);
     
     try {
-  const res = await fetchWithBackoff('/api/me', { 
+      const res = await fetchWithBackoff('/api/me', { 
         credentials: 'include',
-        headers: {
-          'Accept': 'application/json',
-        }
+        headers: { 'Accept': 'application/json' }
       });
       
       if (!res.ok) {
@@ -53,7 +51,7 @@ export function useAuth() {
 
   const logout = useCallback(async () => {
     try {
-      await fetchWithBackoff('/api/logout', { method: 'POST', credentials: 'include' });
+  await fetchWithBackoff('/api/logout', { method: 'POST', credentials: 'include' });
     } catch (err) {
       console.error('Logout error:', err);
     } finally {

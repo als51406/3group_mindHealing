@@ -152,7 +152,7 @@ export default function Support() {
 
       {/* 문의하기 섹션 */}
       <section style={{
-        background: 'linear-gradient(135deg, #C1E6F1 0%, #D5BCFF 100%)',
+        background: 'linear-gradient(135deg, rgb(126 208 233) 0%, #D5BCFF 100%)',
         padding: 48,
         borderRadius: 16,
         color: 'white',
