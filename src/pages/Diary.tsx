@@ -1277,7 +1277,7 @@ export default function Diary() {
 
                     {/* AI 대화 목록 */}
                     {activeTab === 'ai' && (
-                        <div className="diary-list" style={{ display: 'flex', flexDirection: 'column', gap: 6, overflowY: 'auto', flex: 1, minHeight: "54vh" }}>
+                        <div className="diary-list-menu" style={{ display: 'flex', flexDirection: 'column', gap: 6, overflowY: 'auto', flex: 1, minHeight: "50vh" }}>
                             {loadingList ? (
                                 <DiaryListSkeleton />
                             ) : list.length === 0 ? (
