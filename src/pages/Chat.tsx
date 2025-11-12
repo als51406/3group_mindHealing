@@ -736,7 +736,7 @@ const Chat: React.FC = () => {
                                     border: 'none',
                                     background: messageCount >= MIN_REQUIRED_MESSAGES
                                         ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
-                                        : 'linear-gradient(135deg, #C1E6F1 0%, #D5BCFF 100%)',
+                                        : 'linear-gradient(135deg, rgb(126 208 233) 0%, #D5BCFF 100%)',
                                     color: '#fff',
                                     cursor: 'pointer',
                                     fontWeight: 700,

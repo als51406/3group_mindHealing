@@ -1,5 +1,6 @@
 .goalsWrap {
   width: 100%;
+  
 }
 
 .goals-container {
@@ -23,7 +24,7 @@
 }
 
 .create-goal-button {
-  background: linear-gradient(135deg, #C1E6F1 0%, #D5BCFF 100%);
+  background: linear-gradient(135deg, rgb(102, 126, 234) 0%, rgb(118, 75, 162) 100%);
   color: white;
   border: none;
   padding: 12px 24px;
@@ -36,7 +37,7 @@
 
 .create-goal-button:hover {
   transform: translateY(-2px);
-  box-shadow: 0 8px 16px rgba(193, 230, 241, 0.4);
+  box-shadow: 0 8px 16px rgba(102, 126, 234, 0.4);
 }
 
 .goals-tabs {
@@ -59,7 +60,7 @@
 }
 
 .tab-button.active {
-  color: #C1E6F1;
+  color: #667eea;
 }
 
 .tab-button.active::after {
@@ -69,7 +70,7 @@
   left: 0;
   right: 0;
   height: 2px;
-  background: #C1E6F1;
+  background: #667eea;
 }
 
 .goals-loading,
@@ -319,8 +320,8 @@
 .form-group select:focus,
 .form-group textarea:focus {
   outline: none;
-  border-color: #C1E6F1;
-  box-shadow: 0 0 0 3px rgba(193, 230, 241, 0.1);
+  border-color: #667eea;
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
 }
 
 .input-hint {
@@ -357,14 +358,14 @@
 }
 
 .create-modal-button {
-  background: linear-gradient(135deg, #C1E6F1 0%, #D5BCFF 100%);
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   border: none;
   color: white;
 }
 
 .create-modal-button:hover {
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(193, 230, 241, 0.4);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
 }
 
 .category-button {
@@ -381,9 +382,9 @@
 }
 
 .category-button.active {
-  border-color: #C1E6F1;
+  border-color: #667eea;
   background: #eef2ff;
-  color: #C1E6F1;
+  color: #667eea;
 }
 
 .category-button:hover:not(.active) {

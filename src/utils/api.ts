@@ -26,7 +26,11 @@ async function fetchWithBackoff(input: RequestInfo, init: FetchOptions = {}) {
     if (cached && cached.expires > Date.now()) return cached.value;
   }
 
-  if (inFlight.has(key)) return inFlight.get(key);
+  // If caller provided a signal, do not dedupe the request — an AbortController
+  // passed by a component should only cancel that component's request, not a
+  // shared in-flight promise used elsewhere.
+  const hasSignal = !!(init && (init as any).signal);
+  if (!hasSignal && inFlight.has(key)) return inFlight.get(key);
 
   const attempt = async () => {
     const maxRetries = 4;
@@ -72,8 +76,8 @@ async function fetchWithBackoff(input: RequestInfo, init: FetchOptions = {}) {
     }
   };
 
-  const p = attempt().finally(() => inFlight.delete(key));
-  inFlight.set(key, p);
+  const p = attempt().finally(() => { if (!hasSignal) inFlight.delete(key); });
+  if (!hasSignal) inFlight.set(key, p);
   return p;
 }
 

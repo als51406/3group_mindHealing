@@ -149,7 +149,7 @@ export default function History() {
   return (
     <div style={{ 
       minHeight: 'calc(100vh - 56px)',
-      background: 'linear-gradient(135deg, #C1E6F1 0%, #D5BCFF 100%)',
+      background: 'linear-gradient(135deg, rgb(102, 126, 234) 0%, rgb(118, 75, 162) 100%)',
       padding: '32px 16px',
       boxSizing: 'border-box'
     }}>
@@ -175,7 +175,7 @@ export default function History() {
               margin: 0, 
               fontSize: 32, 
               fontWeight: 800,
-              background: 'linear-gradient(135deg, #C1E6F1 0%, #D5BCFF 100%)',
+              background: 'linear-gradient(135deg, #667eea, #D5BCFF 100%)',
               WebkitBackgroundClip: 'text',
               WebkitTextFillColor: 'transparent',
               marginBottom: 8
@@ -202,7 +202,7 @@ export default function History() {
                     <span
                       style={{
                         display: 'inline-block',
-                        background: 'linear-gradient(135deg, #C1E6F1 0%, #D5BCFF 100%)',
+                        background: 'linear-gradient(135deg, rgb(126 208 233) 0%, #D5BCFF 100%)',
                         color: '#fff',
                         padding: '4px 12px',
                         borderRadius: '20px',

@@ -211,6 +211,7 @@ nav:not(.main) {
     padding: 6px 10px;
     border-radius: 6px;
     transition: background-color 0.2s ease;
+    margin-right: -16px;
 }
 
 .logout-btn:hover {
