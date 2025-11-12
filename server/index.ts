@@ -2758,10 +2758,11 @@ app.get('/api/user/emotion-title', authMiddleware, async (req: any, res) => {
       .toArray();
     
     if (sessions.length === 0) {
+      // 신규 사용자: 충분한 대화 기록이 없어 칭호를 부여하지 않음
       return res.json({ 
         ok: true, 
-        title: '감정 탐험가',
-        emotion: '기쁨',
+        title: '',
+        emotion: '',
         color: EMOTION_COLORS_EARLY['기쁨'] || '#FFE066',
         description: '아직 충분한 대화 기록이 없습니다. 더 많은 대화를 나눠보세요!'
       });
@@ -2812,7 +2813,8 @@ ${emotionSummary}
       max_tokens: 50
     });
     
-    const title = completion.choices[0]?.message?.content?.trim() || '감정 탐험가';
+  // OpenAI가 빈값을 반환하면 빈 문자열으로 처리 (프론트엔드에서 '-'로 표시)
+  const title = (completion.choices[0]?.message?.content?.trim() || '').slice(0, 40);
     
     res.json({ 
       ok: true, 

@@ -6,7 +6,6 @@ import { useNavigate } from "react-router-dom";
 import { useDisplay } from "../contexts/DisplayContext";
 import { io, Socket } from "socket.io-client";
 import { useAuth } from '../hooks/useAuth';
-import fetchWithBackoff from '../utils/api';
 import { useToast } from '../components/Toast';
 import { useModal } from '../hooks/useModal';
 import Orb from '../components/Orb';
@@ -110,23 +109,20 @@ export default function Online() {
 
   // 내 프로필 로드
   useEffect(() => {
-    let mounted = true;
-    const controller = new AbortController();
-
     const loadMyProfile = async () => {
       if (!user) return;
 
       try {
         // 기본 프로필 정보
-        const res = await fetchWithBackoff('/api/me', { credentials: 'include', signal: controller.signal } as any);
-        if (!mounted) return;
-
+        const res = await fetch('/api/me', { credentials: 'include' });
         if (res.ok) {
           const data = await res.json();
           console.log('👤 내 프로필 정보:', data.user);
           if (data.user) {
             // 전체 감정 분석의 주 감정 색상 로드
-            const titleRes = await fetchWithBackoff('/api/user/emotion-title', { credentials: 'include', signal: controller.signal } as any);
+            const titleRes = await fetch('/api/user/emotion-title', {
+              credentials: 'include'
+            });
 
             let emotionData = null;
             if (titleRes.ok) {
@@ -141,9 +137,11 @@ export default function Online() {
             }
 
             // 감정 TOP3 로드
-            const statsRes = await fetchWithBackoff('/api/user/emotion-stats', { credentials: 'include', signal: controller.signal } as any);
+            const statsRes = await fetch('/api/user/emotion-stats', {
+              credentials: 'include'
+            });
 
-            let topEmotions: any[] = [];
+            let topEmotions = [];
             if (statsRes.ok) {
               const statsData = await statsRes.json();
               if (statsData.ok && statsData.topEmotions) {
@@ -163,8 +161,6 @@ export default function Online() {
               }
             }
 
-            if (!mounted) return;
-
             setMyProfile({
               id: data.user._id || data.user.id,
               nickname: data.user.nickname || 'User',
@@ -182,21 +178,11 @@ export default function Online() {
           }
         }
       } catch (error) {
-        if ((error as any)?.name === 'AbortError') {
-          // fetch was aborted due to unmount/navigation; do nothing
-          console.log('내 프로필 로드 취소됨');
-        } else {
-          console.error('내 프로필 로드 실패:', error);
-        }
+        console.error('내 프로필 로드 실패:', error);
       }
     };
 
     loadMyProfile();
-
-    return () => {
-      mounted = false;
-      controller.abort();
-    };
   }, [user]);
 
   // 컴포넌트가 언마운트될 때(페이지를 벗어날 때) 실행

@@ -198,23 +198,58 @@ export default function History() {
                 />
               ) : (
                 <>
-                  {userTitle && (
-                    <span
-                      style={{
-                        display: 'inline-block',
-                        background: 'linear-gradient(135deg, rgb(126 208 233) 0%, #D5BCFF 100%)',
-                        color: '#fff',
-                        padding: '4px 12px',
-                        borderRadius: '20px',
-                        fontSize: '14px',
-                        fontWeight: '600',
-                        boxShadow: '0 2px 8px rgba(193, 230, 241, 0.3)',
-                      }}
-                    >
-                      🏆 {userTitle}
-                    </span>
+                  {userTitle ? (
+                    <>
+                      <span
+                        style={{
+                          display: 'inline-block',
+                          background: 'linear-gradient(135deg, rgb(126 208 233) 0%, #D5BCFF 100%)',
+                          color: '#fff',
+                          padding: '4px 12px',
+                          borderRadius: '20px',
+                          fontSize: '14px',
+                          fontWeight: '600',
+                          boxShadow: '0 2px 8px rgba(193, 230, 241, 0.3)',
+                          marginRight: 8
+                        }}
+                      >
+                        🏆 {userTitle}
+                      </span>
+                      <span>{nickname || user.email}님의 감정 변화를 시각적으로 확인하세요</span>
+                    </>
+                  ) : (
+                    <>
+                      <span
+                        style={{
+                          display: 'inline-block',
+                          background: '#f3f4f6',
+                          color: '#6b7280',
+                          padding: '4px 12px',
+                          borderRadius: '20px',
+                          fontSize: '14px',
+                          fontWeight: '600',
+                          marginRight: 12
+                        }}
+                      >
+                        🏅 -
+                      </span>
+                      <span style={{ marginRight: 12 }}>{nickname || user.email}님의 감정 변화를 시각적으로 확인하세요</span>
+                      <button
+                        onClick={() => navigate('/diary')}
+                        style={{
+                          padding: '6px 12px',
+                          background: '#fff',
+                          border: '1px solid #e5e7eb',
+                          borderRadius: 12,
+                          cursor: 'pointer',
+                          fontSize: 13,
+                          color: '#374151'
+                        }}
+                      >
+                        일기 쓰러 가기 →
+                      </button>
+                    </>
                   )}
-                  <span>{nickname || user.email}님의 감정 변화를 시각적으로 확인하세요</span>
                 </>
               )}
             </p>

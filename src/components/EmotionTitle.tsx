@@ -1,6 +1,7 @@
 // EmotionTitle.tsx - 감정 칭호 컴포넌트
 import { useEffect, useState, useRef } from 'react';
 import Toast from './Toast';
+import { useNavigate } from 'react-router-dom';
 
 const CACHE_KEY = 'emotion_title_cache';
 const CACHE_DURATION = 1000 * 60 * 60; // 1시간
@@ -24,6 +25,7 @@ function hexToRgba(hex: string, alpha: number): string {
 }
 
 export default function EmotionTitle() {
+  const navigate = useNavigate();
   const [title, setTitle] = useState('');
   const [loading, setLoading] = useState(true);
   const [regenerating, setRegenerating] = useState(false);
@@ -40,33 +42,25 @@ export default function EmotionTitle() {
       try {
         const { title: cachedTitle, color: cachedColor, timestamp } = JSON.parse(cached);
         const isExpired = Date.now() - timestamp > CACHE_DURATION;
-        
+
         if (!isExpired) {
-          setTitle(cachedTitle);
-          previousTitleRef.current = cachedTitle; // 초기 칭호 저장
-          
-          // 캐시된 색상이 있으면 사용
-          if (cachedColor) {
-            setEmotionColor(cachedColor);
-          }
-          
+          setTitle(cachedTitle || '-');
+          previousTitleRef.current = cachedTitle || '';
+          if (cachedColor) setEmotionColor(cachedColor);
           setLoading(false);
-          // 캐시가 유효하면 API 호출하지 않음
           return;
         }
       } catch (e) {
-        // 캐시 파싱 오류 시 무시
+        // ignore parse errors
       }
     }
 
-    // 중복 호출 방지
-    if (isFetchingRef.current) return;
-    
-    isFetchingRef.current = true;
-    fetchEmotionTitle();
-
+    // No valid cache -> treat as new user (show '-') and do NOT call the API automatically.
+    setTitle('-');
+    previousTitleRef.current = '';
+    setLoading(false);
     return () => {
-      isFetchingRef.current = false;
+      // no-op cleanup
     };
   }, []);
 
@@ -79,32 +73,41 @@ export default function EmotionTitle() {
       if (res.ok) {
         const data = await res.json();
         if (data.ok) {
-          const newTitle = data.title || '감정 탐험가';
-          
-          // 감정 색상 설정
+          const apiTitle = data.title && data.title.trim() ? data.title.trim() : '';
+
+          // 감정 색상 설정 (있을 때만)
           if (data.color) {
             console.log('🎨 EmotionTitle - 칭호 API에서 받은 색상:', data.color);
             setEmotionColor(data.color);
           }
-          
-          // 칭호가 변경되었는지 확인 (첫 로드가 아닌 경우에만)
-          if (previousTitleRef.current && previousTitleRef.current !== newTitle) {
-            setToastMessage(`새로운 칭호를 받았습니다: 🏆 ${newTitle}`);
-            setShowToast(true);
-          }
-          
-          previousTitleRef.current = newTitle;
-          setTitle(newTitle);
-          
-          // 캐시 저장 (색상 정보도 포함)
-          localStorage.setItem(CACHE_KEY, JSON.stringify({
-            title: newTitle,
-            color: data.color || emotionColor,
-            timestamp: Date.now()
-          }));
 
-          // 커스텀 이벤트 발생 (다른 컴포넌트에서 감지 가능)
-          window.dispatchEvent(new Event('titleUpdated'));
+          // API가 실제 칭호를 주지 않으면(신규 사용자 등), '-'로 표시하고 캐시에 저장하지 않음
+          if (!apiTitle) {
+            // 이전에 저장된 칭호가 있었으면 지움
+            previousTitleRef.current = '';
+            setTitle('-');
+          } else {
+            const newTitle = apiTitle;
+
+            // 칭호가 변경되었는지 확인 (첫 로드가 아닌 경우에만)
+            if (previousTitleRef.current && previousTitleRef.current !== newTitle) {
+              setToastMessage(`새로운 칭호를 받았습니다: 🏆 ${newTitle}`);
+              setShowToast(true);
+            }
+
+            previousTitleRef.current = newTitle;
+            setTitle(newTitle);
+
+            // 캐시 저장 (색상 정보도 포함)
+            localStorage.setItem(CACHE_KEY, JSON.stringify({
+              title: newTitle,
+              color: data.color || emotionColor,
+              timestamp: Date.now()
+            }));
+
+            // 커스텀 이벤트 발생 (다른 컴포넌트에서 감지 가능)
+            window.dispatchEvent(new Event('titleUpdated'));
+          }
         }
       }
     } catch (e) {
@@ -222,7 +225,7 @@ export default function EmotionTitle() {
           {title}
         </div>
 
-        {/* 새로고침 버튼 */}
+  {/* 새로고침 버튼 */}
         <div style={{ textAlign: 'center' }}>
           <button
             onClick={regenerateTitle}
@@ -263,6 +266,33 @@ export default function EmotionTitle() {
           AI가 당신의 최근 대화를 분석하여<br />
           감정 특성을 한 문구로 표현했습니다
         </div>
+        {/* 신규 사용자 안내: 칭호가 '-'인 경우 일기 작성 유도 */}
+        {title === '-' && (
+          <div style={{ marginTop: 14, textAlign: 'center' }}>
+            <div style={{ color: 'rgba(255,255,255,0.85)', marginBottom: 8 }}>
+              아직 감정 진단이 없습니다. 다이어리에 첫 일기를 작성하면 감정 진단을 받아 칭호를 부여받을 수 있어요.
+            </div>
+            <div>
+              <button
+                onClick={() => {
+                  // 캐시 무효화 후 SPA 네비게이션
+                  try { localStorage.removeItem(CACHE_KEY); } catch {}
+                  navigate('/diary');
+                }}
+                style={{
+                  padding: '8px 16px',
+                  background: 'rgba(255,255,255,0.2)',
+                  border: '1px solid rgba(255,255,255,0.25)',
+                  borderRadius: 8,
+                  color: '#fff',
+                  cursor: 'pointer'
+                }}
+              >
+                일기 작성하러 가기
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* 칭호 변경 토스트 */}

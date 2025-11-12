@@ -258,7 +258,7 @@ const Profile: React.FC = () => {
       padding: '30px 20px',
       
     }}>
-      <h1>프로필 관리</h1>
+      <h1 style={{paddingBottom:"12px" }}>마이페이지</h1>
       
       {/* 섹션 1: 프로필 미리보기 */}
       <div style={{
