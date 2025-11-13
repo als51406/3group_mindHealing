@@ -909,9 +909,10 @@ export default function Online() {
 
                     return (
                       <div key={i} style={{ display: 'flex', justifyContent: isMine ? 'flex-end' : 'flex-start', marginBottom: 8 }}>
-                        <div style={{
+                        <div className="online-chat-bubble" style={{
                           maxWidth: '70%',
                           border: '2px solid',
+                          // keep dynamic color via inline borderColor so per-message color remains intact
                           borderColor: map.color,
                           borderRadius: isMine ? '40px 10px 35px 40px' : '10px 40px 40px 35px',
                           padding: '14px 20px',

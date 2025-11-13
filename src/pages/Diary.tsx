@@ -1104,7 +1104,7 @@ export default function Diary() {
     const Bubble = (m: DiaryMessage, i: number) => {
         const mine = m.role === 'user';
         // 상대방 닉네임의 첫 글자 (없으면 'AI')
-        const partnerInitial = partnerNickname ? partnerNickname.charAt(0).toUpperCase() : 'AI';
+        const partnerInitial = partnerNickname ? partnerNickname.charAt(0).toUpperCase() : ':)';
         
         return (
             <div key={m.id || i} style={{ display: 'flex', justifyContent: mine ? 'flex-end' : 'flex-start', marginBottom: 8 }}>
