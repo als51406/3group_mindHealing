@@ -802,7 +802,7 @@ export default function Online() {
 
       {/* <4> 챗온 채팅 페이지 -시작- */}
       {display == "chat" && (
-        <div style={{ width: '100vw'}}>
+        <div className="chatWrap" style={{ width: '100vw'}}>
 
           {/* 상대방 프로필 + 내 프로필 */}
           <div className="profile-cards">
@@ -838,12 +838,13 @@ export default function Online() {
           </div>
 
           {/* 메인 컨테이너: 채팅 */}
-          <div style={{
+          <div className="mainchatbox" style={{
             display: 'flex',
             justifyContent: 'center',
             alignItems: 'flex-start',
             gap: 20,
             flexWrap: 'wrap',
+            position:'relative'
           }}>
 
             {/* 중앙: 채팅 영역 */}
@@ -909,10 +910,9 @@ export default function Online() {
 
                     return (
                       <div key={i} style={{ display: 'flex', justifyContent: isMine ? 'flex-end' : 'flex-start', marginBottom: 8 }}>
-                        <div className="online-chat-bubble" style={{
+                        <div style={{
                           maxWidth: '70%',
                           border: '2px solid',
-                          // keep dynamic color via inline borderColor so per-message color remains intact
                           borderColor: map.color,
                           borderRadius: isMine ? '40px 10px 35px 40px' : '10px 40px 40px 35px',
                           padding: '14px 20px',

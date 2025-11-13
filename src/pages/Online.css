@@ -135,6 +135,17 @@
 }
 
 /* 채팅창 */
+
+.chatWrap{ background-image: url('/images/bg3.png');
+  /* 원본 이미지를 여러 개 패턴으로 반복하여 채움 */
+  background-repeat: repeat;
+  /* 타일 크기를 적절히 지정하면 패턴 크기를 제어할 수 있음 (원본에 가깝게 하려면 'auto') */
+  background-size: 720px auto;
+  background-position: top left;
+  /* background-color: rgba(255, 255, 255, 0.215);
+  background-blend-mode: multiply; */
+}
+
 .chat-area {
   height: calc(100vh - 200px);
   padding: 16px;
