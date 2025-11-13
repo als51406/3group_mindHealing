@@ -133,7 +133,7 @@ export default function Login() {
                             </button>
                         </div>
                     </form>
-
+               
                     <div className="login-links">
                         <a href="#" onClick={register} className="login-link">회원가입</a>
                         <span className="link-divider">|</span>
@@ -141,6 +141,7 @@ export default function Login() {
                         <span className="link-divider">|</span>
                         <a href="#" className="login-link">비밀번호 찾기</a>
                     </div>
+               
 
                     <div className="sns-login">
                         <div className="sns-buttons">

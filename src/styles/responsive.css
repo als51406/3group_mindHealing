@@ -128,11 +128,11 @@
 }
 
 /* 🎯 터치 타겟 크기 개선 (접근성) */
-@media (max-width: 768px) {
+/* @media (max-width: 768px) {
     button, a, input[type="submit"] {
         min-height: 44px;
     }
-}
+} */
 
 /* 📱 스크롤바 숨기기 (모바일) */
 @media (max-width: 768px) {
